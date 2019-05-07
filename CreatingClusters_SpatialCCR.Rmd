@@ -1,7 +1,7 @@
 ---
 title: A Guide to Semi-Supervised Cluster Assignment and Covariate-Constrained Randomization for Spatially-Correlated Data
 author: "Patrick Iben"
-date: "May 1, 2019"
+date: "May 7, 2019"
 output:
   html_document: default
   pdf_document: default
