@@ -127,18 +127,6 @@ StudyByVillage_noMagoro <- all
 StudyByVillage_noMagoro$village_code <- ifelse(nchar(StudyByVillage_noMagoro$village_code)<4, paste(0,StudyByVillage_noMagoro$village_code, sep = ""),StudyByVillage_noMagoro$village_code)
 
 #Adding indicator for bordering lake, areas outside of study
-#StudyByVillage_noMagoro$BordersWater = ifelse(StudyByVillage_noMagoro$village_code == "01_1"| StudyByVillage_noMagoro$village_code == "02_1"|  
-#StudyByVillage_noMagoro$village_code == "03_1"| StudyByVillage_noMagoro$village_code == "04_1"| StudyByVillage_noMagoro$village_code == "05_1"|
-#StudyByVillage_noMagoro$village_code == "06_1"| StudyByVillage_noMagoro$village_code == "07_1"| StudyByVillage_noMagoro$village_code == "08_1"|
-#StudyByVillage_noMagoro$village_code == "10_1"| StudyByVillage_noMagoro$village_code == "12_1"| StudyByVillage_noMagoro$village_code == "13_1"|  
-#StudyByVillage_noMagoro$village_code == "14_1"| StudyByVillage_noMagoro$village_code == "16_1"| StudyByVillage_noMagoro$village_code == "17_1"|  
-#StudyByVillage_noMagoro$village_code == "18_1"| StudyByVillage_noMagoro$village_code == "07_3"| StudyByVillage_noMagoro$village_code == "08_3"|  
-#StudyByVillage_noMagoro$village_code == "12_3"| StudyByVillage_noMagoro$village_code == "14_3"| StudyByVillage_noMagoro$village_code == "17_3"|
-#StudyByVillage_noMagoro$village_code == "19_3"| StudyByVillage_noMagoro$village_code == "20_3"| StudyByVillage_noMagoro$village_code == "25_3"|  
-#StudyByVillage_noMagoro$village_code == "26_3"| StudyByVillage_noMagoro$village_code == "28_3"| StudyByVillage_noMagoro$village_code == "29_3"|  
-#StudyByVillage_noMagoro$village_code == "32_3"|StudyByVillage_noMagoro$village_code == "36_3"
-#  ,1,0)
-
 StudyByVillage_noMagoro$BordersWater = ifelse(StudyByVillage_noMagoro$village_code %in% c('01_1', '02_1', '03_1', '04_1', '05_1', '06_1', '07_1', '08_1', '10_1', '12_1', '14_1', '16_1', '17_1', '18_1', '07_3', '08_3', '12_3', '14_3', '17_3', '19_3', '20_3', '25_3', '28_3', '29_3', '32_3', '36_3'),1,0)
 
 
