@@ -1103,10 +1103,11 @@ row.names(study_data_wide) <- study_data_wide$village_code
 #Plotting
 sp::plot(map,border="grey",col=PKbis_geo, main= "Ward-Like Hierarchical Clustering of Size 12 Obtained with only Geographic Location \n (alpha = 1)",cex.main=1)
 legend("topleft", legend=paste("Cluster",1:max(PKbis_geo)), fill=1:max(PKbis_geo), bty="n",border="grey")
+text(coordinates(map), labels = PKbis)
 
 #Black and white
-plot(map, main="Ward-Like Hierarchical Clustering of Size 12 Obtained with only Geographic Location (alpha = 1)",cex.main=2.2)
-text(coordinates(map), labels = PKbis_geo, cex = 2)
+#plot(map, main="Ward-Like Hierarchical Clustering of Size 12 Obtained with only Geographic Location (alpha = 1)",cex.main=2.2)
+#text(coordinates(map), labels = PKbis_geo, cex = 2)
 ```
 
 #####CCR for Ward-like Hierarchical Clustering
