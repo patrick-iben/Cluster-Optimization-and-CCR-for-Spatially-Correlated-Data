@@ -1,7 +1,7 @@
 ---
 title: Cluster Assignment and Covariate-Constrained Randomization for Spatially-Correlated Data
 author: "Patrick Iben"
-date: "July 4 2019"
+date: "July 9, 2019"
 output:
   html_document: default
   pdf_document: default
@@ -11,7 +11,7 @@ output:
 
 Cluster randomized trials (CRTs) are commonly implemented when treatments cannot be randomized to individuals. However, randomization of clusters often results in imbalance with respect to important confounders. To circumvent this imbalance, researchers have applied constraints to the covariate make-up of the clusters so that imbalance is minimized, so-called covariate-based constrained randomization (CCR) [1]. Briefly, in CCR, constraints are applied to all possible randomizations, and among those that satisfy these constraints one is chosen at random.
 
-The purpose of this tutorial is to guide developers of randomized clinical trials through the assignment of units to clusters, and clusters to treatment arms via covariate-constrained randomization. For robustness and evaluation of scalability, mixed covariate data types (e.g., numerical, categorical) from both small and large-scale real-world data scenarios are utilized for the optimization, creation, and assignment of clusters. Three popular clustering algorithms currently implemented in R are used and compared: K-means, Clustering Large Applications (CLARA), and Ward-Like Hierarchical Clustering. The algorithms are compared with respect to their: resultant degree of cluster covariate imbalance after CCR assignment (both weighted and unweighted); overall spatial contiguity of treatment arms after CCR; and CPU run times for each major stage of the process - cluster optimization, weighted CCR and unweighted CCR. 
+The purpose of this tutorial is to guide developers of randomized clinical trials through the assignment of units to clusters, and clusters to treatment arms via covariate-constrained randomization. For robustness and evaluation of scalability, mixed covariate data types (e.g., numerical, categorical) from both small and large-scale real-world data scenarios are utilized for the optimization, creation, and assignment of clusters. Three popular clustering algorithms currently implemented in R are used and compared: K-means, Clustering Large Applications (CLARA), and Ward-like hierarchical clustering. The algorithms are compared with respect to their: resultant degree of cluster covariate imbalance after CCR assignment (both weighted and unweighted); overall spatial contiguity of treatment arms after CCR; and CPU run times for each major stage of the process - cluster optimization, weighted CCR and unweighted CCR. 
 
 ###Methodology
 
@@ -129,19 +129,18 @@ StudyByVillage_noMagoro$village_code <- ifelse(nchar(StudyByVillage_noMagoro$vil
 #Adding indicator for bordering lake, areas outside of study
 StudyByVillage_noMagoro$BordersWater = ifelse(StudyByVillage_noMagoro$village_code %in% c('01_1', '02_1', '03_1', '04_1', '05_1', '06_1', '07_1', '08_1', '10_1', '12_1', '14_1', '16_1', '17_1', '18_1', '07_3', '08_3', '12_3', '14_3', '17_3', '19_3', '20_3', '25_3', '28_3', '29_3', '32_3', '36_3'),1,0)
 
-
-#generically renaming for ease of abstraction
+#Generically renaming for ease of abstraction
 study_data <-StudyByVillage_noMagoro
 
-#ensuring sorted by hierarchy of data
+#Ensuring sorted by hierarchy of data
 study_data<- study_data[with(study_data, order(county, village, survey)), ] 
 
-#transposing long to wide
+#Transposing long to wide
 study_data_wide <- reshape(study_data, idvar = "village_code", sep = "_", timevar = "survey", v.names = c("rdtTests","rdtPos","rrate", "microPos", "microTests", "mrate"),direction = "wide")
 
 #Spatially plotting covariates
 
-# read in the shape file for villages
+#Read in the shape file for villages
 poly1 <- readShapePoly("C:/Users/Patrick/Documents/CCR/CCR/pilgrim_africa_villages_shapefile/pilgrim_villages.shp")
 #plot(poly1)
 #Checking village names in shapefile
@@ -169,7 +168,6 @@ waterPal <- brewer.pal(n = 9, name = "YlGnBu")#water color scheme
 #text(coordinates(map), labels = map$village_code)
 
 rownames(map@data) <- map$village_code 
-
 ```
 
 ####Spatial clustering method 1: K-means with Euclidean Dissimilarities
@@ -256,10 +254,9 @@ study_data_wide <- merge(K_kmeans_clustering, study_data_wide,by = "village_code
 sp::plot(map,border="grey",col=K_kmeans_clustering, main= "12-Cluster Partition Obtained with K-Means on Centroid Euclidean Distance",cex.main=1)
 legend("left", legend=paste("Cluster",1:K_kmeans), fill=1:K_kmeans, bty="n",border="white")
 
-#Black and white visualization of clustering scheme (if nee)
+#Black and white visualization of clustering scheme
 #plot(map, main= "12-Cluster Partition Obtained with K-Means on Centroid Euclidean Distance",cex.main=1 )
 #text(coordinates(map), labels = K_kmeans_clustering[,1])
-
 ```
 
 #####CCR
@@ -856,17 +853,20 @@ PKbis_mat <- as.matrix(cbind(PKbis_mat,hclust_names))
 
 #Merging back hclust scheme
 study_data_wide <- merge(PKbis_mat, study_data_wide, by="village_code")
+colnames(PKbis_mat) <- c("Hierarch_Clusters", "village_sc")#Renaming to match SpatialPolygonsDataframe
+poly1_noMagoro@data <- merge(PKbis_mat, poly1_noMagoro@data, by="village_sc")
 
 #Resetting row names as a failsafe measure
 row.names(study_data_wide) <- study_data_wide$village_code
 
-#Plotting
+#Plotting 
 sp::plot(map,border="grey",col=PKbis, main= "Ward-Like Hierarchical Clustering of Size 18 Obtained with alpha=0.6",cex.main=1)
-legend("topleft", legend=paste("Cluster",1:max(PKbis)), fill=1:max(PKbis), bty="n",border="grey")
+legend("topleft", legend=paste("Cluster",1:max(PKbis)), fill=1:max(PKbis), bty="n",border="grey", cex=0.8)
+text(coordinates(map), labels = PKbis)
 
 #Black and white
-#plot(map, main="Ward-Like Hierarchical Clustering of Size 18 Obtained with alpha=0.6",cex.main=1 )
-#text(coordinates(map), labels = PKbis)
+#plot(map, main="Ward-Like Hierarchical Clustering of Size 18 Obtained with alpha=0.6",cex.main=2)
+#text(coordinates(map), labels = PKbis, cex = 2)
 ```
 
 #####CCR for Ward-like Hierarchical Clustering
@@ -1105,8 +1105,8 @@ sp::plot(map,border="grey",col=PKbis_geo, main= "Ward-Like Hierarchical Clusteri
 legend("topleft", legend=paste("Cluster",1:max(PKbis_geo)), fill=1:max(PKbis_geo), bty="n",border="grey")
 
 #Black and white
-#plot(map, main="Ward-Like Hierarchical Clustering of Size 12 Obtained with only Geographic Location \n (alpha = 1)",cex.main=1 )
-#text(coordinates(map), labels = PKbis_geo)
+plot(map, main="Ward-Like Hierarchical Clustering of Size 12 Obtained with only Geographic Location (alpha = 1)",cex.main=2.2)
+text(coordinates(map), labels = PKbis_geo, cex = 2)
 ```
 
 #####CCR for Ward-like Hierarchical Clustering
@@ -1314,7 +1314,7 @@ colnames(hclust_ccr_scores) <- c("Minimum Score", "Selected Balance Score", "10%
 rbind(k_means_ccr_scores, clara_ccr_scores, hclust_geo_ccr_scores, hclust_ccr_scores)
 ```
 
-In terms of selected balance score, the top four performers were: CLARA with weighted CCR (0.093); Ward-Like Hierarchical clustering with weighted CCR, using geographic location (0.152); K-Means with weighted CCR (0.263); Ward-Like Hierarchical clustering with weighted CCR, using geographic location and covariate dissimilarity (0.283). In terms of the maximum (10%) cutoff score, the top four performers were: CLARA with weighted CCR (0.112); Ward-Like Hierarchical clustering with weighted CCR, using geographic location (0.185); K-Means with weighted CCR (0.299); Ward-Like Hierarchical clustering with weighted CCR, using geographic location and covariate dissimilarity (0.325).
+In terms of selected balance score, the top four performers were: CLARA with weighted CCR (0.093); Ward-like hierarchical clustering with weighted CCR, using geographic location (0.152); K-Means with weighted CCR (0.263); Ward-like hierarchical clustering with weighted CCR, using geographic location and covariate dissimilarity (0.283). In terms of the maximum (10%) cutoff score, the top four performers were: CLARA with weighted CCR (0.112); Ward-like hierarchical clustering with weighted CCR, using geographic location (0.185); K-Means with weighted CCR (0.299); Ward-like hierarchical clustering with weighted CCR, using geographic location and covariate dissimilarity (0.325).
 
 ###CCR Treatment Arm Contiguity (Measured with Mean Nearest Neighbor Distance)
 
@@ -1408,7 +1408,7 @@ rbind(weighted_kmeans_different_meanNNdists_k1, unweighted_kmeans_different_mean
 
 ```
 
-At significance level alpha = 0.05, the CCR allocations that resulted in significantly different mean nearest neighbor distances between treatment arms were: K-Means with weighted and unweighted CCR; CLARA with unweighted CCR; Ward-Like Hierarchical (using Geographic location only) with weighted and unweighted CCR.
+At significance level alpha = 0.05, the CCR allocations that resulted in significantly different mean nearest neighbor distances between treatment arms were: K-Means with weighted and unweighted CCR; CLARA with unweighted CCR; Ward-like hierarchical (using Geographic location only) with weighted and unweighted CCR.
 
 ### CPU Run Times
 
@@ -1441,7 +1441,7 @@ colnames(hclust_runtimes) <- "H-Clust Time Euc. Geo./Gower Cov. (seconds)"
 cbind(kmeans_runtimes,clara_runtimes, hclust_geo_runtimes, hclust_runtimes)
 ```
 
-In terms of CPU run times, Ward-Like Hierarchical clustering with mixed dissimilarities took the longest to run, due to its cluster optimization phase, though by only a few extra seconds. All three geographic location-only methods appear to have no clear differences between them, and are somewhat comparable to one another.
+In terms of CPU run times, Ward-like hierarchical clustering with mixed dissimilarities took the longest to run, due to its cluster optimization phase, though by only a few extra seconds. All three geographic location-only methods appear to have no clear differences between them, and are somewhat comparable to one another.
 
 
 ###Visualization of Treatment Allocations
@@ -1508,17 +1508,15 @@ legend("bottomleft", legend=paste("Treatment",1:2), fill=0:1, bty="n",border="gr
 
 ###Conclusions
 
-Strategic weighting of covariates during CCR, regardless of clustering method, may serve to drastically improve covariate balance during randomization into CRT treatment arms.
-
-In terms of minimizing covariate imbalance, Ward-Like Hierarchical using only geographic location (Euclidean distance) and weighting during CCR appears to perform better than the more complicated, and more compuationally-intensive, mixed-dissimilarity method. For CRT design using Ward-Like Hierarchical clustering with weighted CCR, this added level of sophistication may be unnecessary. Broadly: clustering on geographic location, with weighting during CCR, may sufficiently balance treatment arms with respect to important spatial feature data.
+Strategic weighting of covariates during CCR, regardless of clustering method, served to drastically improve covariate balance during randomization into CRT treatment arms. In terms of minimizing covariate imbalance, Ward-like hierarchical using only geographic location (Euclidean distance) and weighting during CCR appears to perform better than the more complicated, and more computationally-intensive, mixed-dissimilarity method. For CRT design using Ward-like hierarchical clustering with weighted CCR, this added level of sophistication may be unnecessary. Clustering on geographic location - with weighting during CCR - may sufficiently balance treatment arms with respect to important spatial feature data.
 
 Based on 10% cutoff balance scores and CPU run times, either CLARA with weighted CCR or Ward-Like Hierarchical Clustering with Euclidean geographical dissimilarities and weighted CCR may be considered optimal study design strategies. Ward-Like Hierarchical Clustering with Euclidean geographical dissimilarities and weighted CCR maintained spatial heterogeneity of treatment assignments. Thus, for this data scenario, Ward-Like Hierarchical Clustering with Euclidean geographical dissimilarities and weighted CCR performed optimally (i.e., optimized covariate balance while maintaining spatial heterogeneity of treatment assignments).
 
-However, while clustering with geographic dissimilarity and strategic weighting during CCR may suffice for optimizing balance on spatial feature (covariate) data, it does not guarantee that the scheme randomly selected at the end of CCR avoids spatial contamination of treatment arms. To do so requires additional methodology, in which only allocation schemes that result in spatial heterogeneity of treatment arms are considered during CCR.
+In this paper, we presented a stepwise methodological approach to mitigating covariate imbalance and intervention contamination in a CRT. Future enhancements to this approach might include optimization of covariate imbalance and spatial clustering of intervention arms simultaneously.
 
 ###Limitations
 
-For simplicity, the only cluster quality statistic used to optimize clustering methods was average silhouette width. It may be of interest to examine additional, potential cluster quality statistics that are applicable for clustering on a variety of data types (e.g., numerical, nominal, ordinal). Furthermore, "ClustGeo" limits the maximum number of clusters to 55; this may be impractical for some large CRT studies. For large CRTs, K-Means or CLARA with weighted CCR may be preferable to Ward-Like Hierarchical clustering.
+For simplicity, the only cluster quality statistic used to optimize clustering methods was average silhouette width. It may be of interest to examine additional, potential cluster quality statistics that are applicable for clustering on a variety of data types (e.g., numerical, nominal, ordinal). Furthermore, "ClustGeo" limits the maximum number of clusters to 55; this may be impractical for some large CRT studies. For large CRTs, K-Means or CLARA with weighted CCR may be preferable to Ward-Like hierarchical clustering.
 
 Clustering and treatment assignments, as well as conclusions on spatial heterogeneity of treatment assignments, may be influenced by geographical barriers between units (e.g., mountains, canyons, swamps). These barriers may prevent spatial contamination of subjects across units, but they were not considered in the applications presented here.
 
