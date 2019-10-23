@@ -1,7 +1,7 @@
 ---
 title: Cluster Assignment and Covariate-Constrained Randomization for Spatially-Correlated Data
 author: "Patrick Iben"
-date: "July 9, 2019"
+date: "October 13, 2019"
 output:
   html_document: default
   pdf_document: default
@@ -43,7 +43,7 @@ library(RColorBrewer)
 library(sp)
 library(maptools) 
 library(lattice)
-library(latticeExtra) # For layer()
+library(latticeExtra)
 library(rgdal)
 library(classInt)
 require(gridExtra)
@@ -57,18 +57,22 @@ library(spdep)
 library(foreign)
 library(spatstat)
 library(gmodels)
+library(tools)
 
-### read in village data
-vill <- read.csv('C:/Users/Patrick/Documents/CCR/CCR/study_by_village.csv')
+#Setting working directory for village-level spatial feature data
+setwd('C:/Users/Patrick/Documents/CCR/CCR/')
+
+#Reading in village data
+vill <- read.csv('study_by_village.csv')
 vill2 <- vill[c(1:10, 21, 22)]
 
-#fix village names
-library(tools)
+#Fixing village names with toTitleCase() function from the "tools" package
 vill2$village_name <- toTitleCase(as.character(vill2$village_name))
 
-# get Magoro and Toroma village names
-vnames <- read.csv('C:/Users/Patrick/Documents/CCR/CCR/villageNames.csv')
+#Reading in Magoro and Toroma village names
+vnames <- read.csv('villageNames.csv')
 
+#Merging in and formatting village, subcounty names
 tab3 <- merge(vill2, vnames, by.x = c("subcounty", "village"),
               by.y = c("repcty", "village.2"), all.x = T)
 tab3$village_name.y <- as.character(tab3$village_name.y)
@@ -77,60 +81,70 @@ tab3$village_name <- tab3$village_name.x
 tab3$village_name <- ifelse(is.na(tab3$village_name)==T, tab3$village_name.y, tab3$village_name)
 tab3$village_name <- toTitleCase(tolower(tab3$village_name))
 
-lim <- subset(tab3, duplicated(village_code) == F) # dropped 2
+#Removing duplicate codes
+lim <- subset(tab3, duplicated(village_code) == F)
+
+#Creating identifier that combines village and subcounty
 lim$village_code <- paste(lim$village, lim$subcounty, sep="_")
 
-# get household by village information
-hh <- read.csv('C:/Users/Patrick/Documents/CCR/CCR/hhPerVillage.csv')
+#Getting household information, by village
+hh <- read.csv('hhPerVillage.csv')
 hh$village_code <- paste(hh$village, hh$county, sep="_")
+
+#Nulling out extraneous village and county names
 hh$village <- NULL
 hh$county <- NULL
 
+#Merging household and village data by village and subcounty
 lim2 <- merge(lim, hh, by="village_code", all.x=T)
-#plot(lim2$pop, lim2$population)
-#plot(lim2$population, lim2$hh)
+
+#Creating derived variable for household density
 lim2$hhDensity <- lim2$hh/lim2$areakm2
 
-vstat <- read.csv('C:/Users/Patrick/Documents/CCR/CCR/surveyResultsByVillage.csv')
+#Reading in survey-level data, surveys 1 to 4
+vstat <- read.csv('surveyResultsByVillage.csv')
 vstat$X <- NULL
 
-s5 <- read.csv('C:/Users/Patrick/Documents/CCR/CCR/s5data.csv')
+#Reading in most recent survey-level data
+s5 <- read.csv('s5data.csv')
 s5lim <- subset(s5, Scounty != 2)
 s5lim$survey <- 5
 
-#Merging in survey 5 microscopy data
-s5micro <- read.csv("C:/Users/Patrick/Documents/CCR/CCR/s5micros.csv")
+#Reading in survey 5 microscopy data
+s5micro <- read.csv("s5micros.csv")
 s5micro$survey <- 5
+
+#Removing county serving as control group
 s5microlim <- subset(s5micro, Scounty != 2)
+
+#Cleaning up microscopy variable names
 colnames(s5microlim)[colnames(s5microlim)=="microsPos"] <- "microPos"
 colnames(s5microlim)[colnames(s5microlim)=="microsTests"] <- "microTests"
 
+#Merging microscopy data into the rest of the survey 5 data
 s5lim <- merge(s5lim, s5microlim, by.x=c("Scounty", "Village", "survey"), 
               by.y=c("Scounty", "Village", "survey"), all = T)
 
 a1 <- merge(vstat, s5lim, by.x=c("county", "village", "survey", "rdtPos", "rdtTests", "microPos", "microTests"), 
               by.y=c("Scounty", "Village", "survey", "rdtPos", "rdtTests", "microPos", "microTests"), all = T)
 
-all <- merge(a1, lim2, by.x = c("county", "village"), 
-             by.y = c("subcounty", "village"))
+#Merging into final collection of all study data
+all <- merge(a1, lim2, by.x = c("county", "village"), by.y = c("subcounty", "village"))
+#Nulling out old village names
 all$village_name.x <- NULL
 all$village_name.y <- NULL
-
+#Calculating prevalence rates
 all$mrate <- all$microPos/all$microTests
-#tapply(all$mrate, all$survey, mean)
-
 all$rrate <- all$rdtPos/all$rdtTests
-#tapply(all$rrate, all$survey, mean)
 
-StudyByVillage_noMagoro <- all
+#Ensuring that single-digit village codes have leading 0
+all$village_code <- ifelse(nchar(all$village_code)<4, paste(0,all$village_code, sep = ""),all$village_code)
 
-StudyByVillage_noMagoro$village_code <- ifelse(nchar(StudyByVillage_noMagoro$village_code)<4, paste(0,StudyByVillage_noMagoro$village_code, sep = ""),StudyByVillage_noMagoro$village_code)
+#Adding indicator for bordering lake or wetlands
+all$BordersWater = ifelse(all$village_code %in% c('01_1', '02_1', '03_1', '04_1', '05_1', '06_1', '07_1', '08_1', '10_1', '12_1', '14_1', '16_1', '17_1', '18_1', '07_3', '08_3', '12_3', '14_3', '17_3', '19_3', '20_3', '25_3', '28_3', '29_3', '32_3', '36_3'),1,0)
 
-#Adding indicator for bordering lake, areas outside of study
-StudyByVillage_noMagoro$BordersWater = ifelse(StudyByVillage_noMagoro$village_code %in% c('01_1', '02_1', '03_1', '04_1', '05_1', '06_1', '07_1', '08_1', '10_1', '12_1', '14_1', '16_1', '17_1', '18_1', '07_3', '08_3', '12_3', '14_3', '17_3', '19_3', '20_3', '25_3', '28_3', '29_3', '32_3', '36_3'),1,0)
-
-#Generically renaming for ease of abstraction
-study_data <-StudyByVillage_noMagoro
+#Generically renaming for ease of interpretation
+study_data <- all
 
 #Ensuring sorted by hierarchy of data
 study_data<- study_data[with(study_data, order(county, village, survey)), ] 
@@ -141,33 +155,29 @@ study_data_wide <- reshape(study_data, idvar = "village_code", sep = "_", timeva
 #Spatially plotting covariates
 
 #Read in the shape file for villages
-poly1 <- readShapePoly("C:/Users/Patrick/Documents/CCR/CCR/pilgrim_africa_villages_shapefile/pilgrim_villages.shp")
-#plot(poly1)
+poly1 <- readShapePoly("pilgrim_africa_villages_shapefile/pilgrim_villages.shp")
+
 #Checking village names in shapefile
 #poly1@data
-#Not using subcounty 2, subsetting rows 0-54
+#Creating subset without control group
 poly1_noMagoro <- poly1[c(1:55),]
 
-#Comparing and matching row names in dataframe
+#Comparing and matching row names for merging
 #row.names(poly1_noMagoro)
 row.names(poly1_noMagoro@data) <-poly1_noMagoro@data$village_sc
 row.names(poly1_noMagoro) <- row.names(poly1_noMagoro@data)
 #row.names(study_data_wide)
 rownames(study_data_wide) <- study_data_wide$village_code
 
-#Building spatial poly df
-
+#Building spatial polygons dataframe from shape file and feature data
 map <- SpatialPolygonsDataFrame(poly1_noMagoro, study_data_wide)
 
+#Assigning village codes to row names
+rownames(map@data) <- map$village_code
+
+#Adding color palette schemes using brewer.pal() funtion from 'RColorBrewer' package
 tempPal <- brewer.pal(n = 6, name = "YlOrRd")#N color scheme
 waterPal <- brewer.pal(n = 9, name = "YlGnBu")#water color scheme
-
-#Quick visualization of village codes
-#colors=rainbow(length(map$village_code))
-#plot(map,col=colors)
-#text(coordinates(map), labels = map$village_code)
-
-rownames(map@data) <- map$village_code 
 ```
 
 ####Spatial clustering method 1: K-means with Euclidean Dissimilarities
@@ -177,7 +187,7 @@ K-means is one of the most widely-used methods to cluster data. Unfortunately, t
 First, the unit-dependent spatial variables, provided as village longitude and latitude for this example, are extracted from the shape file using the coordinates() function from the "sp" package [3].
 
 ```{r, echo=T, message=F, warning=F}
-#Extracting xy coordinates
+#Extracting spatial location coordinates
 spatial_data <- coordinates(poly1_noMagoro)
 ```
 
@@ -193,14 +203,15 @@ The process of graphically determining optimal clustering sizes for a given data
 An array is initialized for each cluster quality statistic value available, for every cluster size value to be tested. For this example, between 6 and 18 (the closest even number of clusters that averages to at least 3 units/cluster for this 55-unit example) clusters are tested. As a reminder, to ensure equal cluster sizes for treatment arms, only even cluster sizes are considered.
 
 ```{r, echo=T, message=F, warning=F}
-minclust <- 6 #Setting minimum K for cluster size
+#Setting minimum K for cluster size
+minclust <- 6 
 
 #Setting maximum K for cluster size to ensure at least 3 units per cluster
 n_3 <- round((nrow(study_data_wide))/3)
 n_3_even <- ifelse(n_3 %% 2 != 0, n_3-1, n_3)#If odd, subtract 1
-#If (closest even number under number of units divided by 3 *3) is greater than number of units, then subtract 2 from previous line for maxclust
+#If ((closest even number under number of units divided by 3) *3)) is greater than number of units, then subtract 2 from previous line for the maximum cluster size
 maxclust <- ifelse((n_3_even*3) > nrow(study_data_wide), n_3_even-2, n_3_even)
-#For this example, 18 clusters max. will be tested.
+#For this example, 18 clusters maximum will be tested
 ```
 
 Next, we iteratively collect cluster quality statistics for each cluster size with a for() loop. Note: for reproducibility, a seed is set within the for() loop and before the clustering.
@@ -209,16 +220,21 @@ After running through the sensitivity analysis to determine the optimal cluster 
 
 ```{r, echo=T, message=F, warning=F}
 #Getting cluster quality by K
-start_time <- Sys.time()#starting timer
 
-clustering_list <- list()#Initializing listing of cluster assignments for each value of K
-quality_list <- list()#Initializing listing of cluster value quality for each value of K
+#Starting timer
+start_time <- Sys.time()
 
-#Average Silhouette Width (observation).
+#Initializing listing of cluster assignments for each value of K
+clustering_list <- list()
+#Initializing listing of cluster value quality for each value of K
+quality_list <- list()
+
+#Average Silhouette Width (observation)
+#Initializing cluster quality statistic matrix
 ASW <- matrix(data = NA, nrow = maxclust-minclust+1, ncol = 1, byrow = FALSE,dimnames = NULL)
 row.names(ASW) <- minclust:maxclust
 
-#Gathering Average Silhouette Width for all cluster sizes between min. and max. cluster size set
+#Collecting cluster quality statistics across range of cluster sizes
 for(i in minclust:maxclust){
   set.seed(30)
   clustering_list[[i-(minclust-1)]] <- kmeans(spatial_data, i)$cluster
@@ -226,16 +242,18 @@ for(i in minclust:maxclust){
   ASW[i-(minclust-1)] <- quality_list[[i-(minclust-1)]]$stats[4]
 } 
 
-#If several values equal to the optimal statistic, selects the minimum K (first value in array)
-ASW_valid <- ASW[seq(1, nrow(ASW), 2),] #Only looking at even K values for CCR (starting from minimum K)
-K_ASW <- as.numeric(names(ASW_valid)[which(ASW_valid == max(ASW_valid), arr.ind = TRUE)])[1]
+#Only optimizing for even K values for CCR (starting from minimum K)
+ASW_valid <- ASW[seq(1, nrow(ASW), 2),]
 
 #Using average silhouette width to determine optimal K
+#If several values equal to the optimal statistic, selects the minimum K (first value in array)
+K_ASW <- as.numeric(names(ASW_valid)[which(ASW_valid == max(ASW_valid), arr.ind = TRUE)])[1]
 K_kmeans <- K_ASW
 
+#Stopping timer
 end_time <- Sys.time()
 
-#Saving clustering selection run time
+#Saving cluster selection run time
 K_means_selection_time <- end_time - start_time
 
 #Saving cluster assignments with optimal K
@@ -269,14 +287,15 @@ study_data_wide$scaled_microPos_1 <- scale(study_data_wide$microPos_1)
 study_data_wide$scaled_BordersWater <- scale(study_data_wide$BordersWater)
 study_data_wide$scaled_hhDensity <- scale(study_data_wide$hhDensity)
 
+#Creating Poisson model with offset
 weight_model <- glm(microPos_5 ~ scaled_microPos_1 + scaled_BordersWater + scaled_hhDensity+ offset(log(microTests_5)) -1, 
                  data=study_data_wide, family = poisson)
 summary(weight_model)
 
-#Scaling and saving weights
+#Scaling and saving model coefficients for CCR weights
 weights <- c(abs(weight_model$coefficients[1][[1]])/sum(abs(weight_model$coefficients)), abs(weight_model$coefficients[2][[1]])/sum(abs(weight_model$coefficients)), abs(weight_model$coefficients[3][[1]])/sum(abs(weight_model$coefficients)))
 
-weights #0.5057831 0.2225534 0.2716635
+weights
 ```
 
 "cvcrand" only allows for data sets with row number equal to the number of clusters. Thus, we first aggregate our unit-level covariate data into cluster-level summary statistics. 
@@ -285,7 +304,7 @@ weights #0.5057831 0.2225534 0.2716635
 #Subsetting variables of interest, cluster assignments
 kmeans_assignments_reduced <- study_data_wide[,c("K_means_Clusters","microPos_5","microPos_1", "microTests_5","microTests_1", "BordersWater", "hhDensity")]
 
-#Getting aggregate statistics by clusters
+#Getting aggregate statistics by cluster
 kmeans_assignments_reduced$Cluster_Sum_mPos_5 <- with(kmeans_assignments_reduced, ave(microPos_5, K_means_Clusters, FUN=sum))
 
 kmeans_assignments_reduced$Cluster_Sum_mPos_1 <- with(kmeans_assignments_reduced, ave(microPos_1, K_means_Clusters, FUN=sum))
@@ -314,6 +333,7 @@ To perform the CCR, the cvrall() function from the "cvcrand" package is used.
 Weighted:
 
 ```{r, echo=T, message=F, warning=F}
+#Starting timer
 start_time <- Sys.time()
 
 #Weighted CCR
@@ -327,19 +347,11 @@ kmeans_Weighted_Design_result <- cvrall(clustername = kmeans_assignments_reduced
                   cutoff = 0.1,
                   seed = 12345)
 
+#Stopping timer
 end_time <- Sys.time()
 
-#Saving ccr run time
+#Saving CCR run time
 Weighted_K_means_ccr_time <- end_time - start_time
-
-#Allocation scheme
-#kmeans_Weighted_Design_result$allocation
-
-#Descriptive statistics for all the variables by the two arms from the selected scheme
-#kmeans_Weighted_Design_result$baseline_table
-
-#Dataframe with treatment allocations
-#kmeans_Weighted_Design_result$data_CR
 
 #Adding the treatment assignments to the dataframe for visualization
 weighted_allocations_kmeans <- kmeans_Weighted_Design_result$allocation
@@ -354,21 +366,32 @@ Kmeans_clusters_weighted_ccr_1 <- merge(K_kmeans_clustering,weighted_allocations
 Kmeans_clusters_weighted_ccr_1 <- Kmeans_clusters_weighted_ccr_1[order(Kmeans_clusters_weighted_ccr_1$id), ]
 #Subsetting village code and clusters
 Kmeans_clusters_weighted_ccr_1 <- Kmeans_clusters_weighted_ccr_1[,c(4,2)]
-rownames(Kmeans_clusters_weighted_ccr_1) <- Kmeans_clusters_weighted_ccr_1[,2]#labeling rows
+#Labeling rows
+rownames(Kmeans_clusters_weighted_ccr_1) <- Kmeans_clusters_weighted_ccr_1[,2]
 
 #Balance score for min. scheme
-weighted_kmeans_ccr_min_score <- as.numeric(kmeans_Weighted_Design_result$bscores[5,2])#0.084
+weighted_kmeans_ccr_min_score <- as.numeric(kmeans_Weighted_Design_result$bscores[5,2])
 #Balance score for selected scheme
-weighted_kmeans_ccr_selected_score <- as.numeric(kmeans_Weighted_Design_result$bscores[1,2])#0.263
+weighted_kmeans_ccr_selected_score <- as.numeric(kmeans_Weighted_Design_result$bscores[1,2])
 #Balance score for 10% cutoff scheme
-weighted_kmeans_ccr_cutoff_score <- as.numeric(kmeans_Weighted_Design_result$bscores[2,2])#0.299
+weighted_kmeans_ccr_cutoff_score <- as.numeric(kmeans_Weighted_Design_result$bscores[2,2])
 #Balance score for max. scheme
-weighted_kmeans_ccr_max_score <- as.numeric(kmeans_Weighted_Design_result$bscores[14,2])#4.737
+weighted_kmeans_ccr_max_score <- as.numeric(kmeans_Weighted_Design_result$bscores[14,2])
+
+#Allocation scheme
+#kmeans_Weighted_Design_result$allocation
+
+#Descriptive statistics for all the variables by the two arms from the selected scheme
+#kmeans_Weighted_Design_result$baseline_table
+
+#Dataframe with treatment allocations
+#kmeans_Weighted_Design_result$data_CR
 ```
 
 Unweighted:
 
 ```{r, echo=T, message=F, warning=F}
+#Starting timer
 start_time <- Sys.time()
 
 #Unweighted CCR
@@ -381,19 +404,11 @@ kmeans_Unweighted_Design_result <- cvrall(clustername = kmeans_assignments_reduc
                   size = 25000000,
                   seed = 12345)
 
+#Stopping timer
 end_time <- Sys.time()
 
 #Saving ccr run time
 Unweighted_K_means_ccr_time <- end_time - start_time
-
-#Allocation scheme
-#kmeans_Unweighted_Design_result$allocation
-
-#Descriptive statistics for all the variables by the two arms from the selected scheme
-#kmeans_Unweighted_Design_result$baseline_table
-
-#Dataframe with treatment allocations
-#kmeans_Unweighted_Design_result$data_CR
 
 #Adding the treatment assignments to the dataframe for visualization
 allocations_unweighted_kmeans <- kmeans_Unweighted_Design_result$allocation
@@ -407,17 +422,26 @@ Kmeans_clusters_unweighted_ccr_1 <- Kmeans_clusters_unweighted_ccr_1[order(Kmean
 
 #Subsetting village code and clusters
 Kmeans_clusters_unweighted_ccr_1 <- Kmeans_clusters_unweighted_ccr_1[,c(4,2)]
-rownames(Kmeans_clusters_unweighted_ccr_1) <- Kmeans_clusters_unweighted_ccr_1[,2]#labeling rows
+#Labeling rows
+rownames(Kmeans_clusters_unweighted_ccr_1) <- Kmeans_clusters_unweighted_ccr_1[,2]
 
 #Balance score for min. scheme
-unweighted_kmeans_ccr_min_score <- as.numeric(kmeans_Unweighted_Design_result$bscores[5,2])#1.358
+unweighted_kmeans_ccr_min_score <- as.numeric(kmeans_Unweighted_Design_result$bscores[5,2])
 #Balance score for selected scheme
-unweighted_kmeans_ccr_selected_score <- as.numeric(kmeans_Unweighted_Design_result$bscores[1,2])#3.34
+unweighted_kmeans_ccr_selected_score <- as.numeric(kmeans_Unweighted_Design_result$bscores[1,2])
 #Balance score for 10% cutoff scheme
-unweighted_kmeans_ccr_cutoff_score <- as.numeric(kmeans_Unweighted_Design_result$bscores[2,2])#3.671
+unweighted_kmeans_ccr_cutoff_score <- as.numeric(kmeans_Unweighted_Design_result$bscores[2,2])
 #Balance score for max. scheme
-unweighted_kmeans_ccr_max_score <- as.numeric(kmeans_Unweighted_Design_result$bscores[14,2])#39.751
+unweighted_kmeans_ccr_max_score <- as.numeric(kmeans_Unweighted_Design_result$bscores[14,2])
 
+#Allocation scheme
+#kmeans_Unweighted_Design_result$allocation
+
+#Descriptive statistics for all the variables by the two arms from the selected scheme
+#kmeans_Unweighted_Design_result$baseline_table
+
+#Dataframe with treatment allocations
+#kmeans_Unweighted_Design_result$data_CR
 ```
 
 #####Measuring contiguity of treatment assignments
@@ -453,7 +477,6 @@ Unweighted_kmeans_treatment_0 <- cbind(Unweighted_kmeans_treatment_0$village_lon
 Unweighted_kmeans_treatment_1 <- subset(study_data_wide,study_data_wide$Unweighted_K_means_Treatment_Allocation ==1)
 Unweighted_kmeans_treatment_1 <- cbind(Unweighted_kmeans_treatment_1$village_long, Unweighted_kmeans_treatment_1$village_lat)
 
-
 #Saving CIs for mean nearest-neighbor distance, by treatment allocation
 Unweighted_kmeans_treatment_0_nndistCI_k1 <- ci(nndist(Unweighted_kmeans_treatment_0), confidence = 0.95)
 Unweighted_kmeans_treatment_1_nndistCI_k1 <- ci(nndist(Unweighted_kmeans_treatment_1), confidence = 0.95)
@@ -472,7 +495,8 @@ To determine the optimal number of clusters, the same methodology provided above
 Let us re-initialize an array for our cluster quality statistic (average silhouette width), for every cluster size value to be tested. Again, we test between 6 and 18 clusters, and only even cluster sizes are considered.
 
 ```{r, echo=T, message=F, warning=F}
-#Average Silhouette width (observation).
+#Average Silhouette width (observation)
+#Initializing cluster quality statistic matrix
 ASW <- matrix(data = NA, nrow = maxclust-minclust+1, ncol = 1, byrow = FALSE,dimnames = NULL)
 row.names(ASW) <- minclust:maxclust
 ```
@@ -481,11 +505,16 @@ Next, we iteratively collect the cluster quality statistic for each cluster size
 
 ```{r, echo=T, message=F, warning=F}
 #Getting cluster quality by K
+
+#Starting timer
 start_time <- Sys.time()
 
-clustering_list <- list()#Initializing listing of cluster assignments for each value of K
-quality_list <- list()#Initializing listing of cluster value quality for each value of K
+#Initializing listing of cluster assignments for each value of K
+clustering_list <- list()
+#Initializing listing of cluster value quality for each value of K
+quality_list <- list()
 
+#Collecting cluster quality statistic across range of cluster sizes
 for(i in minclust:maxclust){
   set.seed(30)
   clustering_list[[i-(minclust-1)]] <- clara(spatial_data, metric = "euclidean", k = i)$cluster
@@ -493,19 +522,21 @@ for(i in minclust:maxclust){
   ASW[i-(minclust-1)] <- quality_list[[i-(minclust-1)]]$stats[4]
 } 
 
-#If several values equal to the minimized difference, selects the minimum K (first value in array)
+#Only looking at even K values for CCR (starting from minimum K)
+ASW_valid <- ASW[seq(1, nrow(ASW), 2),]
 
-ASW_valid <- ASW[seq(1, nrow(ASW), 2),] #Only looking at even K values for CCR (starting from minimum K)
+#Using average silhouette width to determine optimal K
+#If several values equal to the optimal statistic, selects the minimum K (first value in array)
 K_ASW <- as.numeric(names(ASW_valid)[which(ASW_valid == max(ASW_valid), arr.ind = TRUE)])[1]
 
 #Using average silhouette width to determine optimal K
 K_clara <- K_ASW
 
+#Stopping timer
 end_time <- Sys.time()
 
 #Saving clustering selection run time
 clara_selection_time <- end_time - start_time
-
 ```
 
 After running through the sensitivity analysis to determine the optimal cluster size and saving the value, the clara() clustering algorithm is rerun with this value. The clustering scheme is then extracted and merged back into the main study data.
@@ -530,7 +561,6 @@ legend("bottomleft", legend=paste("Cluster",1:K_clara), fill=1:K_clara, bty="n",
 #Black and white
 #plot(map, main="8-Cluster Partition Obtained with CLARA on Centroid Euclidean Distance" ,cex.main=1)
 #text(coordinates(map), labels = K_clara_clustering[,1])
-
 ```
 
 #####CCR
@@ -558,16 +588,17 @@ clara_assignments_reduced$Cluster_Med_hhDensity <- with(clara_assignments_reduce
 
 clara_assignments_reduced$Cluster_MeanProp_BordersWater <- with(clara_assignments_reduced, ave(BordersWater, CLARA_Clusters, FUN=mean))
 
-#ensuring sorted by clustering
+#Ensuring sorted by clustering
 clara_assignments_reduced <- clara_assignments_reduced[order(clara_assignments_reduced$CLARA_Clusters),]
 
-#outputting one row per subgroup summary stats
+#Outputting one row per subgroup summary stats
 clara_assignments_reduced <- clara_assignments_reduced[!duplicated(clara_assignments_reduced$CLARA_Clusters),]
 ```
 
 CLARA Weighted:
 
 ```{r, echo=T, message=F, warning=F}
+#Starting timer
 start_time <- Sys.time()
 
 #Weighted CCR
@@ -581,18 +612,10 @@ CLARA_Weighted_Design_result <- cvrall(clustername = clara_assignments_reduced$C
                   size = 25000000,
                   seed = 12345)
 
-#Allocation scheme
-#CLARA_Weighted_Design_result$allocation
-
-# the descriptive statistics for all the variables by the two arms from the selected scheme
-#CLARA_Weighted_Design_result$baseline_table
-
-#Dataframe with treatment allocations
-#CLARA_Weighted_Design_result$data_CR
-
+#Stopping timer
 end_time <- Sys.time()
 
-#Saving ccr run time
+#Saving CCR run time
 Weighted_clara_ccr_time <- end_time - start_time
 
 #Adding the treatment assignments to the dataframe for visualization
@@ -608,21 +631,33 @@ clara_clusters_weighted_ccr_1 <- merge(K_clara_clustering,clara_weighted_allocat
 clara_clusters_weighted_ccr_1 <- clara_clusters_weighted_ccr_1[order(clara_clusters_weighted_ccr_1$id), ]
 #Subsetting village code and clusters
 clara_clusters_weighted_ccr_1 <- clara_clusters_weighted_ccr_1[,c(4,2)]
-rownames(clara_clusters_weighted_ccr_1) <- clara_clusters_weighted_ccr_1[,2]#labeling rows
 
-#Balance score for min scheme
-weighted_clara_ccr_min_score <- as.numeric(CLARA_Weighted_Design_result$bscores[5,2])#0.066
+#Labeling rows
+rownames(clara_clusters_weighted_ccr_1) <- clara_clusters_weighted_ccr_1[,2]
+
+#Balance score for min. scheme
+weighted_clara_ccr_min_score <- as.numeric(CLARA_Weighted_Design_result$bscores[5,2])
 #Balance score for selected scheme
-weighted_clara_ccr_selected_score <- as.numeric(CLARA_Weighted_Design_result$bscores[1,2])#0.093
+weighted_clara_ccr_selected_score <- as.numeric(CLARA_Weighted_Design_result$bscores[1,2])
 #Balance score for cutoff scheme
-weighted_clara_ccr_cutoff_score <- as.numeric(CLARA_Weighted_Design_result$bscores[2,2])#0.112
-#Balance score for max scheme
-weighted_clara_ccr_max_score <- as.numeric(CLARA_Weighted_Design_result$bscores[14,2])#1.886
+weighted_clara_ccr_cutoff_score <- as.numeric(CLARA_Weighted_Design_result$bscores[2,2])
+#Balance score for max. scheme
+weighted_clara_ccr_max_score <- as.numeric(CLARA_Weighted_Design_result$bscores[14,2])
+
+#Allocation scheme
+#CLARA_Weighted_Design_result$allocation
+
+#Descriptive statistics for all the variables by the two arms from the selected scheme
+#CLARA_Weighted_Design_result$baseline_table
+
+#Dataframe with treatment allocations
+#CLARA_Weighted_Design_result$data_CR
 ```
 
 CLARA Unweighted:
 
 ```{r, echo=T, message=F, warning=F}
+#Starting timer
 start_time <- Sys.time()
 
 #Unweighted CCR
@@ -635,18 +670,10 @@ CLARA_Unweighted_Design_result <- cvrall(clustername = clara_assignments_reduced
                   cutoff = 0.1,
                   seed = 12345)
 
-#Allocation scheme
-#CLARA_Unweighted_Design_result$allocation
-
-# the descriptive statistics for all the variables by the two arms from the selected scheme
-#CLARA_Unweighted_Design_result$baseline_table
-
-#Dataframe with treatment allocations
-#CLARA_Unweighted_Design_result$data_CR
-
+#Stopping timer
 end_time <- Sys.time()
 
-#Saving ccr run time
+#Saving CCR run time
 Unweighted_clara_ccr_time <- end_time - start_time
 
 #Adding the treatment assignments to the dataframe for visualization
@@ -660,16 +687,27 @@ clara_clusters_unweighted_ccr_1 <- merge(K_clara_clustering,clara_unweighted_all
 clara_clusters_unweighted_ccr_1 <- clara_clusters_unweighted_ccr_1[order(clara_clusters_unweighted_ccr_1$id), ]
 #Subsetting village code and clusters
 clara_clusters_unweighted_ccr_1 <- clara_clusters_unweighted_ccr_1[,c(4,2)]
-rownames(clara_clusters_unweighted_ccr_1) <- clara_clusters_unweighted_ccr_1[,2]#labeling rows
 
-#Balance score for min scheme
-unweighted_clara_ccr_min_score <- as.numeric(CLARA_Unweighted_Design_result$bscores[5,2])#0.716
+#Labeling rows
+rownames(clara_clusters_unweighted_ccr_1) <- clara_clusters_unweighted_ccr_1[,2]
+
+#Balance score for min. scheme
+unweighted_clara_ccr_min_score <- as.numeric(CLARA_Unweighted_Design_result$bscores[5,2])
 #Balance score for selected scheme
-unweighted_clara_ccr_selected_score <- as.numeric(CLARA_Unweighted_Design_result$bscores[1,2])#0.776
+unweighted_clara_ccr_selected_score <- as.numeric(CLARA_Unweighted_Design_result$bscores[1,2])
 #Balance score for cutoff scheme
-unweighted_clara_ccr_cutoff_score <- as.numeric(CLARA_Unweighted_Design_result$bscores[2,2])#1.767
-#Balance score for max scheme
-unweighted_clara_ccr_max_score <- as.numeric(CLARA_Unweighted_Design_result$bscores[14,2])#12.921
+unweighted_clara_ccr_cutoff_score <- as.numeric(CLARA_Unweighted_Design_result$bscores[2,2])
+#Balance score for max. scheme
+unweighted_clara_ccr_max_score <- as.numeric(CLARA_Unweighted_Design_result$bscores[14,2])
+
+#Allocation scheme
+#CLARA_Unweighted_Design_result$allocation
+
+#Descriptive statistics for all the variables by the two arms from the selected scheme
+#CLARA_Unweighted_Design_result$baseline_table
+
+#Dataframe with treatment allocations
+#CLARA_Unweighted_Design_result$data_CR
 ```
 
 Comparing the dispersion of treatment arms on nearest neighbor distance (k = 1):
@@ -717,7 +755,7 @@ Whether or not the unit (village) borders water (Y/N):
 
 ```{r, echo=T, message=F, warning=F}
 #Spatially plotting covariates of interest
-#borders water indicator
+#Borders water indicator (ensuring factorization prior to spatial plotting)
 map$BordersWater <- as.factor(map$BordersWater)
 sp_out_BordersWater <- spplot(map, c("BordersWater"), 
        colorkey=list(space="right"), scales = list(draw = TRUE), 
@@ -729,35 +767,35 @@ sp_out_BordersWater
 Unit household density:
 
 ```{r, echo=T, message=F, warning=F}
-#hh density
+#Household density
 sp_out_hhDensity <- spplot(map, c("hhDensity"), 
        colorkey=list(space="right"), scales = list(draw = TRUE), 
-       main = "Village Household Density", as.table = TRUE, 
-       col.regions = waterPal, col = "transparent", cuts = 8)
+       main = "Village Household Density (per square kilometer)", as.table = TRUE, 
+        col = "transparent", cuts = 8)
 sp_out_hhDensity
 ```
 
 Recent survey positive microscopy rate:
 
 ```{r, echo=T, message=F, warning=F}
-#microscopy rate, each phase
+#Most recent survey positive microscopy rate
+sp_out_mrate5 <-spplot(map, c("mrate_5"), 
+       names.attr = c("Survey 5"), 
+       colorkey=list(space="right"), scales = list(draw = TRUE), 
+       main = "Malaria Prevalence Rate, Survey 5", as.table = TRUE, 
+       col.regions = tempPal, col = "transparent", at = seq(0, 0.5, 0.1))
+sp_out_mrate5
+
+#Microscopy rate, each survey
 #sp_out_mrate <-spplot(map, c("mrate_1","mrate_2", "mrate_3", "mrate_4", "mrate_5"), 
 #      names.attr = c("Survey 1","Survey 2","Survey 3", "Survey 4", "Survey 5"), 
 #       colorkey=list(space="right"), scales = list(draw = TRUE), 
 #       main = "Positive Microscopy Rate, by Survey", as.table = TRUE, 
 #       col.regions = tempPal, col = "transparent", cuts = 5)
 #sp_out_mrate
-
-sp_out_mrate5 <-spplot(map, c("mrate_5"), 
-       names.attr = c("Survey 5"), 
-       colorkey=list(space="right"), scales = list(draw = TRUE), 
-       main = "Positive Microscopy Rate, Survey 5", as.table = TRUE, 
-       col.regions = tempPal, col = "transparent", at = seq(0, 0.5, 0.1))
-sp_out_mrate5
-
 ```
 
-The ""Clustgeo" package allows users to achieve Ward-Like hierarchical clustering with non-Euclidean dissimilarity measures, and non-uniform weight. This allows accommodation of mixed data types (e.g., numeric, ordinal, binary), which may often be used for spatial feature data. 
+The "Clustgeo" package allows users to achieve Ward-Like hierarchical clustering with non-Euclidean dissimilarity measures, and non-uniform weight. This allows accommodation of mixed data types (e.g., numeric, ordinal, binary), which may often be used for spatial feature data. 
 
 We start by extracting the primary spatial feature covariate data for the study. For this example, our spatial feature data is: recent survey positive microscopy rate for malaria; whether or not a unit borders water; and unit house-hold density.
 
@@ -788,39 +826,44 @@ D1_dist = as.dist(D1)
 The weighting for dissimilarity matrix importance ranges from 0 to 1, in increments of 0.1 - called alpha by developers. According to the developers of the package, 0 represents full weighting on spatial feature data, 1 full weighting on geographical location. To determine the optimal cluster size and alpha level, we use the choicealpha() function from the "Clustgeo" package to calculate the proportion of explained psuedo-inertia for each cluster size of interest. The optimal alpha level is determined by the value at which the difference between the explained pseudo-inertia for covariate and geographical dissimilarity is minimized. If several values are equal to the minimized difference, then the minimum alpha value is selected.
 
 ```{r, echo=T, message=F, warning=F}
-start_time <- Sys.time()#start timer
+#Starting timer
+start_time <- Sys.time()
 
-#setting maxclust for "ClustGeo"
+#Setting max. cluster size for "ClustGeo"
 maxclust_hclust <- ifelse(maxclust > 54, 54, maxclust)
 
-#initializing empty sets to store explained psuedo-inertia
+#Initializing empty sets to store explained psuedo-inertia
 cr <- rep(list(NA), maxclust-minclust+1)
 
+#Covariates
 Q0 <- matrix(data = NA, nrow = maxclust-minclust+1, ncol = 11, byrow = FALSE,dimnames = NULL)
 row.names(Q0) <- minclust:maxclust
 colnames(Q0) <- c(seq(0.0, 1.0, 0.1))
 
+#Geographical Location
 Q1 <- matrix(data = NA, nrow = maxclust-minclust+1, ncol = 11, byrow = FALSE,dimnames = NULL)
 row.names(Q1) <- minclust:maxclust
 colnames(Q1) <- c(seq(0.0, 1.0, 0.1))
 
+#Setting values of alpha to optimize over
 range.alpha <- seq(0,1,0.1)
 
 #Gathering proportions of explained pseudo intertia, for every alpha and cluster size
 for (w in 1:11) {
 for(i in minclust:maxclust_hclust){
 cr[[i-(minclust-1)]] <- choicealpha(D0_dist,D1_dist,range.alpha,i,graph=FALSE)
- # proportion of explained pseudo inertia
+#Proportion of explained pseudo inertia
 Q0[i-(minclust-1),w] <- cr[[i-(minclust-1)]]$Q[,1][w]
 Q1[i-(minclust-1),w] <- cr[[i-(minclust-1)]]$Q[,2][w]
 }}
 
-#Minimizing difference between Q0 and Q1. Subsetting only even clusterings
+#Minimizing difference between Q0 and Q1
 Q0_Q1_diff <- abs(Q0-Q1)
 
-Q0_Q1_diff_valid <- Q0_Q1_diff[seq(1, nrow(Q0_Q1_diff), 2), ] #Only looking at even K values for CCR (starting from minimum K) 
+#Only looking at even K values for CCR (starting from minimum K) 
+Q0_Q1_diff_valid <- Q0_Q1_diff[seq(1, nrow(Q0_Q1_diff), 2), ] 
 
-#Selecting optimal K
+#Selecting optimal K as minimized magnitude difference between Q0 and Q1
 K_hclust <- as.numeric(rownames(Q0_Q1_diff_valid)[which(Q0_Q1_diff_valid == min(Q0_Q1_diff_valid), arr.ind = TRUE)][1])
 
 #Selecting optimal alpha 
@@ -828,7 +871,8 @@ alpha_hclust <- as.numeric(colnames(Q0_Q1_diff_valid)[which(Q0_Q1_diff_valid == 
 #If several values equal to the minimized difference, selects the minimum alpha
 alpha_hclust <- ifelse(is.na(alpha_hclust),  (which(Q0_Q1_diff_valid == min(Q0_Q1_diff_valid), arr.ind = TRUE)[1,2] - 1 )/ 10, alpha_hclust)
 
-end_time <- Sys.time()#Stop timer
+#Stop timer
+end_time <- Sys.time()
 
 #Saving clustering run time
 hclust_selection_time <- end_time - start_time
@@ -851,9 +895,10 @@ hclust_names <- as.matrix(rownames(PKbis_mat))
 colnames(hclust_names) <- "village_code"
 PKbis_mat <- as.matrix(cbind(PKbis_mat,hclust_names))
 
-#Merging back hclust scheme
+#Merging back hierarchical clustering scheme
 study_data_wide <- merge(PKbis_mat, study_data_wide, by="village_code")
-colnames(PKbis_mat) <- c("Hierarch_Clusters", "village_sc")#Renaming to match SpatialPolygonsDataframe
+#Renaming to match SpatialPolygonsDataframe
+colnames(PKbis_mat) <- c("Hierarch_Clusters", "village_sc")
 poly1_noMagoro@data <- merge(PKbis_mat, poly1_noMagoro@data, by="village_sc")
 
 #Resetting row names as a failsafe measure
@@ -903,6 +948,7 @@ hclust_assignments_reduced <- hclust_assignments_reduced[!duplicated(hclust_assi
 Weighted CCR for Ward-Like Hierarchical Clustering:
 
 ```{r, echo=T, message=F, warning=F}
+#Starting timer
 start_time <- Sys.time()
 
 #Weighted CCR
@@ -916,17 +962,10 @@ hclust_Weighted_Design_result <- cvrall(clustername = hclust_assignments_reduced
                   size = 25000000,
                   seed = 12345)
 
-#Allocation scheme
-#hclust_Weighted_Design_result$allocation
-
-# the descriptive statistics for all the variables by the two arms from the selected scheme
-#hclust_Weighted_Design_result$baseline_table
-
-#Dataframe with treatment allocations
-#hclust_Weighted_Design_result$data_CR
-
+#Stopping timer
 end_time <- Sys.time()
-#Saving ccr run time
+
+#Saving CCR run time
 Weighted_hclust_ccr_time <- end_time - start_time
 
 #Adding the treatment assignments to the dataframe for visualization
@@ -943,21 +982,32 @@ hclust_clusters_weighted_ccr_1 <- merge(K_hclust_clustering,hclust_weighted_allo
 hclust_clusters_weighted_ccr_1 <- hclust_clusters_weighted_ccr_1[order(hclust_clusters_weighted_ccr_1$id), ]
 #Subsetting village code and clusters
 hclust_clusters_weighted_ccr_1 <- hclust_clusters_weighted_ccr_1[,c(4,2)]
-rownames(hclust_clusters_weighted_ccr_1) <- hclust_clusters_weighted_ccr_1[,2]#labeling rows
+#Labeling rows
+rownames(hclust_clusters_weighted_ccr_1) <- hclust_clusters_weighted_ccr_1[,2]
 
 #Balance score for min. scheme
-weighted_hclust_ccr_min_score <- as.numeric(hclust_Weighted_Design_result$bscores[5,2])#0.000
+weighted_hclust_ccr_min_score <- as.numeric(hclust_Weighted_Design_result$bscores[5,2])
 #Balance score for selected scheme
-weighted_hclust_ccr_selected_score <- as.numeric(hclust_Weighted_Design_result$bscores[1,2])#0.283
+weighted_hclust_ccr_selected_score <- as.numeric(hclust_Weighted_Design_result$bscores[1,2])
 #Balance score for cutoff scheme
-weighted_hclust_ccr_cutoff_score <- as.numeric(hclust_Weighted_Design_result$bscores[2,2])#0.325
+weighted_hclust_ccr_cutoff_score <- as.numeric(hclust_Weighted_Design_result$bscores[2,2])
 #Balance score for max. scheme
-weighted_hclust_ccr_max_score <- as.numeric(hclust_Weighted_Design_result$bscores[14,2])#12.935
+weighted_hclust_ccr_max_score <- as.numeric(hclust_Weighted_Design_result$bscores[14,2])
+
+#Allocation scheme
+#hclust_Weighted_Design_result$allocation
+
+#Descriptive statistics for all the variables by the two arms from the selected scheme
+#hclust_Weighted_Design_result$baseline_table
+
+#Dataframe with treatment allocations
+#hclust_Weighted_Design_result$data_CR
 ```
 
 Unweighted CCR for Ward-Like Hierarchical Clustering:
 
 ```{r, echo=T, message=F, warning=F}
+#Starting timer
 start_time <- Sys.time()
 
 #Unweighted CCR
@@ -970,18 +1020,10 @@ hclust_Unweighted_Design_result <- cvrall(clustername = hclust_assignments_reduc
                   size = 25000000,
                   seed = 12345)
 
-#Allocation scheme
-#hclust_Unweighted_Design_result$allocation
-
-# the descriptive statistics for all the variables by the two arms from the selected scheme
-#hclust_Unweighted_Design_result$baseline_table
-
-#Dataframe with treatment allocations
-#hclust_Unweighted_Design_result$data_CR
-
+#Stopping timer
 end_time <- Sys.time()
 
-#Saving ccr run time
+#Saving CCR run time
 Unweighted_hclust_ccr_time <- end_time - start_time
 
 #Adding the treatment assignments to the dataframe for visualization
@@ -994,16 +1036,26 @@ hclust_clusters_unweighted_ccr_1 <- merge(K_hclust_clustering,hclust_unweighted_
 hclust_clusters_unweighted_ccr_1 <- hclust_clusters_unweighted_ccr_1[order(hclust_clusters_unweighted_ccr_1$id), ]
 #Subsetting village code and clusters
 hclust_clusters_unweighted_ccr_1 <- hclust_clusters_unweighted_ccr_1[,c(4,2)]
-rownames(hclust_clusters_unweighted_ccr_1) <- hclust_clusters_unweighted_ccr_1[,2]#labeling rows
+#Labeling rows
+rownames(hclust_clusters_unweighted_ccr_1) <- hclust_clusters_unweighted_ccr_1[,2]
 
 #Balance score for min. scheme
-unweighted_hclust_ccr_min_score <- as.numeric(hclust_Unweighted_Design_result$bscores[5,2])#0.000
+unweighted_hclust_ccr_min_score <- as.numeric(hclust_Unweighted_Design_result$bscores[5,2])
 #Balance score for selected scheme
-unweighted_hclust_ccr_selected_score <- as.numeric(hclust_Unweighted_Design_result$bscores[1,2])#1.886
+unweighted_hclust_ccr_selected_score <- as.numeric(hclust_Unweighted_Design_result$bscores[1,2])
 #Balance score for cutoff scheme
-unweighted_hclust_ccr_cutoff_score <- as.numeric(hclust_Unweighted_Design_result$bscores[2,2])# 2.866
+unweighted_hclust_ccr_cutoff_score <- as.numeric(hclust_Unweighted_Design_result$bscores[2,2])
 #Balance score for max. scheme
-unweighted_hclust_ccr_max_score <- as.numeric(hclust_Unweighted_Design_result$bscores[14,2])#84.845
+unweighted_hclust_ccr_max_score <- as.numeric(hclust_Unweighted_Design_result$bscores[14,2])
+
+#Allocation scheme
+#hclust_Unweighted_Design_result$allocation
+
+#Descriptive statistics for all the variables by the two arms from the selected scheme
+#hclust_Unweighted_Design_result$baseline_table
+
+#Dataframe with treatment allocations
+#hclust_Unweighted_Design_result$data_CR
 ```
 
 Comparing the spatial dispersion of treatment arms on nearest neighbor distance (k = 1):
@@ -1050,10 +1102,14 @@ To determine the optimal cluster size using only location, we lock alpha at alph
 
 ```{r, echo=T, message=F, warning=F}
 #Getting cluster quality by K
-start_time <- Sys.time()#starting timer
 
-clustering_list <- list()#Initializing listing of cluster assignments for each value of K
-quality_list <- list()#Initializing listing of cluster value quality for each value of K
+#Starting timer
+start_time <- Sys.time()
+
+#Initializing listing of cluster assignments for each value of K
+clustering_list <- list()
+#Initializing listing of cluster value quality for each value of K
+quality_list <- list()
 
 #Average Silhouette width (observation).
 ASW <- matrix(data = NA, nrow = maxclust-minclust+1, ncol = 1, byrow = FALSE,dimnames = NULL)
@@ -1062,20 +1118,22 @@ row.names(ASW) <- minclust:maxclust
 #Performing hierarchical clustering with alpha locked at 1
 tree_geo <- hclustgeo(D0_dist,D1_dist,alpha=1)
 
-#Getting average silhouette width
+#Collecting cluster quality statistic across range of cluster sizes
 for(i in minclust:maxclust_hclust){
   clustering_list[[i-(minclust-1)]] <- cutree(tree_geo,i)#Making K cuts
   quality_list[[i-(minclust-1)]]  <- wcClusterQuality(D1_dist,clustering_list[[i-(minclust-1)]])
   ASW[i-(minclust-1)] <- quality_list[[i-(minclust-1)]]$stats[4]
 } 
 
-#If several values equal to the optimal statistic, then selects the minimum K (first value in array)
-ASW_valid <- ASW[seq(1, nrow(ASW), 2),] #Only looking at even K values for CCR (starting from minimum K)
-K_ASW <- as.numeric(names(ASW_valid)[which(ASW_valid == max(ASW_valid), arr.ind = TRUE)])[1]
+#Only looking at even K values for CCR (starting from minimum K)
+ASW_valid <- ASW[seq(1, nrow(ASW), 2),] 
 
 #Using average silhouette width to determine optimal K
+#If several values equal to the optimal statistic, then selects the minimum K (first value in array)
+K_ASW <- as.numeric(names(ASW_valid)[which(ASW_valid == max(ASW_valid), arr.ind = TRUE)])[1]
 K_hclust_geo <- K_ASW
 
+#Stopping timer
 end_time <- Sys.time()
 
 #Saving clustering selection run time
@@ -1103,7 +1161,7 @@ row.names(study_data_wide) <- study_data_wide$village_code
 #Plotting
 sp::plot(map,border="grey",col=PKbis_geo, main= "Ward-Like Hierarchical Clustering of Size 12 Obtained with only Geographic Location \n (alpha = 1)",cex.main=1)
 legend("topleft", legend=paste("Cluster",1:max(PKbis_geo)), fill=1:max(PKbis_geo), bty="n",border="grey")
-text(coordinates(map), labels = PKbis)
+text(coordinates(map), labels = PKbis_geo)
 
 #Black and white
 #plot(map, main="Ward-Like Hierarchical Clustering of Size 12 Obtained with only Geographic Location (alpha = 1)",cex.main=2.2)
@@ -1134,16 +1192,17 @@ hclust_geo_assignments_reduced$Cluster_MeanProp_BordersWater <- with(hclust_geo_
 
 hclust_geo_assignments_reduced$Cluster_Sum_BordersWater <- with(hclust_geo_assignments_reduced, ave(as.numeric(BordersWater) - 1, Hierarch_Geo_Clusters, FUN=sum))
 
-#ensuring sorted by clustering
+#Ensuring sorted by clustering
 hclust_geo_assignments_reduced <- hclust_geo_assignments_reduced[order(hclust_geo_assignments_reduced$Hierarch_Geo_Clusters),]
 
-#outputting one row per subgroup summary stats
+#Outputting one row per subgroup summary stats
 hclust_geo_assignments_reduced <- hclust_geo_assignments_reduced[!duplicated(hclust_geo_assignments_reduced$Hierarch_Geo_Clusters),]
 ```
 
 Weighted CCR for Ward-Like Hierarchical Clustering (Euclidean Distance Only):
 
 ```{r, echo=T, message=F, warning=F}
+#Starting timer
 start_time <- Sys.time()
 
 #Weighted CCR
@@ -1157,17 +1216,10 @@ hclust_geo_Weighted_Design_result <- cvrall(clustername = hclust_geo_assignments
                   size = 25000000,
                   seed = 12345)
 
-#Allocation scheme
-#hclust_geo_Weighted_Design_result$allocation
-
-# the descriptive statistics for all the variables by the two arms from the selected scheme
-#hclust_geo_Weighted_Design_result$baseline_table
-
-#Dataframe with treatment allocations
-#hclust_geo_Weighted_Design_result$data_CR
-
+#Stopping timer
 end_time <- Sys.time()
-#Saving ccr run time
+
+#Saving CCR run time
 Weighted_hclust_geo_ccr_time <- end_time - start_time
 
 #Adding the treatment assignments to the dataframe for visualization
@@ -1184,21 +1236,32 @@ hclust_geo_clusters_weighted_ccr_1 <- merge(K_hclust_geo_clustering,hclust_geo_w
 hclust_geo_clusters_weighted_ccr_1 <- hclust_geo_clusters_weighted_ccr_1[order(hclust_geo_clusters_weighted_ccr_1$id), ]
 #Subsetting village code and clusters
 hclust_geo_clusters_weighted_ccr_1 <- hclust_geo_clusters_weighted_ccr_1[,c(4,2)]
-rownames(hclust_geo_clusters_weighted_ccr_1) <- hclust_geo_clusters_weighted_ccr_1[,2]#labeling rows
+#Labeling rows
+rownames(hclust_geo_clusters_weighted_ccr_1) <- hclust_geo_clusters_weighted_ccr_1[,2]
 
 #Balance score for min. scheme
-weighted_hclust_geo_ccr_min_score <- as.numeric(hclust_geo_Weighted_Design_result$bscores[5,2])#0.02
+weighted_hclust_geo_ccr_min_score <- as.numeric(hclust_geo_Weighted_Design_result$bscores[5,2])
 #Balance score for selected scheme
-weighted_hclust_geo_ccr_selected_score <- as.numeric(hclust_geo_Weighted_Design_result$bscores[1,2])#0.152
+weighted_hclust_geo_ccr_selected_score <- as.numeric(hclust_geo_Weighted_Design_result$bscores[1,2])
 #Balance score for cutoff scheme
-weighted_hclust_geo_ccr_cutoff_score <- as.numeric(hclust_geo_Weighted_Design_result$bscores[2,2])#0.185
+weighted_hclust_geo_ccr_cutoff_score <- as.numeric(hclust_geo_Weighted_Design_result$bscores[2,2])
 #Balance score for max. scheme
-weighted_hclust_geo_ccr_max_score <- as.numeric(hclust_geo_Weighted_Design_result$bscores[14,2])#5.814
+weighted_hclust_geo_ccr_max_score <- as.numeric(hclust_geo_Weighted_Design_result$bscores[14,2])
+
+#Allocation scheme
+#hclust_geo_Weighted_Design_result$allocation
+
+#Descriptive statistics for all the variables by the two arms from the selected scheme
+#hclust_geo_Weighted_Design_result$baseline_table
+
+#Dataframe with treatment allocations
+#hclust_geo_Weighted_Design_result$data_CR
 ```
 
 Unweighted CCR for Ward-Like Hierarchical Clustering (Euclidean Distance Only):
 
 ```{r, echo=T, message=F, warning=F}
+#Starting timer
 start_time <- Sys.time()
 
 #Unweighted CCR
@@ -1211,18 +1274,10 @@ hclust_geo_Unweighted_Design_result <- cvrall(clustername = hclust_geo_assignmen
                   size = 25000000,
                   seed = 12345)
 
-#Allocation scheme
-#hclust_geo_Unweighted_Design_result$allocation
-
-# the descriptive statistics for all the variables by the two arms from the selected scheme
-#hclust_geo_Unweighted_Design_result$baseline_table
-
-#Dataframe with treatment allocations
-#hclust_geo_Unweighted_Design_result$data_CR
-
+#Stopping timer
 end_time <- Sys.time()
 
-#Saving ccr run time
+#Saving CCR run time
 Unweighted_hclust_geo_ccr_time <- end_time - start_time
 
 #Adding the treatment assignments to the dataframe for visualization
@@ -1235,52 +1290,64 @@ hclust_geo_clusters_unweighted_ccr_1 <- merge(K_hclust_geo_clustering,hclust_geo
 hclust_geo_clusters_unweighted_ccr_1 <- hclust_geo_clusters_unweighted_ccr_1[order(hclust_geo_clusters_unweighted_ccr_1$id), ]
 #Subsetting village code and clusters
 hclust_geo_clusters_unweighted_ccr_1 <- hclust_geo_clusters_unweighted_ccr_1[,c(4,2)]
-rownames(hclust_geo_clusters_unweighted_ccr_1) <- hclust_geo_clusters_unweighted_ccr_1[,2]#labeling rows
+#Labeling rows
+rownames(hclust_geo_clusters_unweighted_ccr_1) <- hclust_geo_clusters_unweighted_ccr_1[,2]
 
 #Balance score for min. scheme
-unweighted_hclust_geo_ccr_min_score <- as.numeric(hclust_geo_Unweighted_Design_result$bscores[5,2])#0.242
+unweighted_hclust_geo_ccr_min_score <- as.numeric(hclust_geo_Unweighted_Design_result$bscores[5,2])
 #Balance score for selected scheme
-unweighted_hclust_geo_ccr_selected_score <- as.numeric(hclust_geo_Unweighted_Design_result$bscores[1,2])#1.632
+unweighted_hclust_geo_ccr_selected_score <- as.numeric(hclust_geo_Unweighted_Design_result$bscores[1,2])
 #Balance score for cutoff scheme
-unweighted_hclust_geo_ccr_cutoff_score <- as.numeric(hclust_geo_Unweighted_Design_result$bscores[2,2])#2.002
+unweighted_hclust_geo_ccr_cutoff_score <- as.numeric(hclust_geo_Unweighted_Design_result$bscores[2,2])
 #Balance score for max. scheme
-unweighted_hclust_geo_ccr_max_score <- as.numeric(hclust_geo_Unweighted_Design_result$bscores[14,2])#31.655
+unweighted_hclust_geo_ccr_max_score <- as.numeric(hclust_geo_Unweighted_Design_result$bscores[14,2])
+
+#Allocation scheme
+#hclust_geo_Unweighted_Design_result$allocation
+
+#Descriptive statistics for all the variables by the two arms from the selected scheme
+#hclust_geo_Unweighted_Design_result$baseline_table
+
+#Dataframe with treatment allocations
+#hclust_geo_Unweighted_Design_result$data_CR
 ```
 
 Comparing the spatial dispersion of treatment arms on nearest neighbor distance (k = 1):
 
 ```{r, echo=T, message=F, warning=F}
 #Weighted CCR
+#Treatment 0
 Weighted_hclust_geo_treatment_0 <- subset(study_data_wide,study_data_wide$Weighted_Hierarch_Geo_Treatment_Allocation ==0)
 Weighted_hclust_geo_treatment_0 <- cbind(Weighted_hclust_geo_treatment_0$village_long,Weighted_hclust_geo_treatment_0$village_lat)
-
+#Treatment 1
 Weighted_hclust_geo_treatment_1 <- subset(study_data_wide,study_data_wide$Weighted_Hierarch_Geo_Treatment_Allocation ==1)
 Weighted_hclust_geo_treatment_1 <- cbind(Weighted_hclust_geo_treatment_1$village_long,Weighted_hclust_geo_treatment_1$village_lat)
 
-#Saving CIs for mean nearest-neighbor distance, by treatment allocation
+#Saving CIs for mean nearest-neighbor distance, by treatment arm
 #Treatment 0
 Weighted_hclust_geo_treatment_0_nndistCI_k1 <- ci(nndist(Weighted_hclust_geo_treatment_0), confidence = 0.95)
 #Treatment 1
 Weighted_hclust_geo_treatment_1_nndistCI_k1 <- ci(nndist(Weighted_hclust_geo_treatment_1), confidence = 0.95)
 
-#Testing for significant differences in mean nn-dist with Welch Two Sample t-test
+#Testing for significant differences in treatment arm mean nearest-neighbor distance with Welch Two Sample t-test
 Weighted_hclust_geo_ttest_k1 <- t.test(nndist(Weighted_hclust_geo_treatment_0), nndist(Weighted_hclust_geo_treatment_1))
 Weighted_hclust_geo_different_meanNNdists_k1 <- ifelse(Weighted_hclust_geo_ttest_k1$p.value < 0.05, 1, 0)
 
 #Unweighted CCR
+#Treatment 0
 Unweighted_hclust_geo_treatment_0 <- subset(study_data_wide,study_data_wide$Unweighted_Hierarch_Geo_Treatment_Allocation ==0)
 Unweighted_hclust_geo_treatment_0 <- cbind(Unweighted_hclust_geo_treatment_0$village_long,Unweighted_hclust_geo_treatment_0$village_lat)
-
+#Treatment 1
 Unweighted_hclust_geo_treatment_1 <- subset(study_data_wide,study_data_wide$Unweighted_Hierarch_Geo_Treatment_Allocation ==1)
 Unweighted_hclust_geo_treatment_1 <- cbind(Unweighted_hclust_geo_treatment_1$village_long,Unweighted_hclust_geo_treatment_1$village_lat)
 
-#Saving CIs for mean nearest-neighbor distance, by treatment allocation
+#Saving CIs for mean nearest-neighbor distance, by treatment arm
 #Treatment 0
 Unweighted_hclust_geo_treatment_0_nndistCI_k1 <- ci(nndist(Unweighted_hclust_geo_treatment_0), confidence = 0.95)
 #Treatment 1
 Unweighted_hclust_geo_treatment_1_nndistCI_k1 <- ci(nndist(Unweighted_hclust_geo_treatment_1), confidence = 0.95)
 
-#Testing for significant differences in mean nn-dist with Welch Two Sample t-test
+#Testing for significant differences in treatment arm mean nearest-neighbor distance with Welch Two Sample t-test
 Unweighted_hclust_geo_ttest_k1 <- t.test(nndist(Unweighted_hclust_geo_treatment_0), nndist(Unweighted_hclust_geo_treatment_1))
 Unweighted_hclust_geo_different_meanNNdists_k1 <- ifelse(Unweighted_hclust_geo_ttest_k1$p.value < 0.05, 1, 0)
 ```
@@ -1291,22 +1358,22 @@ Unweighted_hclust_geo_different_meanNNdists_k1 <- ifelse(Unweighted_hclust_geo_t
 ####CCR Scores
 
 ```{r, echo=F, message=F, warning=F}
-#kmeans
+#K-Means
 k_means_ccr_scores <- cbind(c(weighted_kmeans_ccr_min_score,unweighted_kmeans_ccr_min_score), c(weighted_kmeans_ccr_selected_score,unweighted_kmeans_ccr_selected_score), c(weighted_kmeans_ccr_cutoff_score, unweighted_kmeans_ccr_cutoff_score), c(weighted_kmeans_ccr_max_score,unweighted_kmeans_ccr_max_score), c(K_kmeans/2, K_kmeans/2), c(kmeans_Weighted_Design_result$overall_allocations[3], kmeans_Unweighted_Design_result$overall_allocations[3]))
 rownames(k_means_ccr_scores) <- c("K-Means Weighted", "K-Means Unweighted")
 colnames(k_means_ccr_scores) <- c("Minimum Score", "Selected Balance Score", "10% Cutoff Score", "Maximum Score", "Number of Clusters in Each Treatment Arm", "Number of Allocations in Randomization Space")
 
-#clara
+#CLARA
 clara_ccr_scores <- cbind(c(weighted_clara_ccr_min_score,unweighted_clara_ccr_min_score), c(weighted_clara_ccr_selected_score,unweighted_clara_ccr_selected_score), c(weighted_clara_ccr_cutoff_score, unweighted_clara_ccr_cutoff_score), c(weighted_clara_ccr_max_score,unweighted_clara_ccr_max_score), c(K_clara/2, K_clara/2), c(CLARA_Weighted_Design_result$overall_allocations[3], CLARA_Unweighted_Design_result$overall_allocations[3]))
 rownames(clara_ccr_scores) <- c("CLARA Weighted", "CLARA Unweighted")
 colnames(clara_ccr_scores) <- c("Minimum Score", "Selected Balance Score", "10% Cutoff Score", "Maximum Score", "Number of Clusters in Each Treatment Arm", "Number of Allocations in Randomization Space")
 
-#hclust - geo only
+#Hierarchical - geographic location only
 hclust_geo_ccr_scores <- cbind(c(weighted_hclust_geo_ccr_min_score,unweighted_hclust_geo_ccr_min_score), c(weighted_hclust_geo_ccr_selected_score,unweighted_hclust_geo_ccr_selected_score), c(weighted_hclust_geo_ccr_cutoff_score, unweighted_hclust_geo_ccr_cutoff_score), c(weighted_hclust_geo_ccr_max_score,unweighted_hclust_geo_ccr_max_score), c(K_hclust_geo/2, K_hclust_geo/2), c(hclust_geo_Weighted_Design_result$overall_allocations[3], hclust_geo_Unweighted_Design_result$overall_allocations[3]))
 rownames(hclust_geo_ccr_scores) <- c("H-Clust Weighted - Geo. Only", "H-Clust Unweighted - Geo. Only")
 colnames(hclust_geo_ccr_scores) <- c("Minimum Score", "Selected Balance Score", "10% Cutoff Score", "Maximum Score", "Number of Clusters in Each Treatment Arm", "Number of Allocations in Randomization Space")
 
-#hclust
+#Ward-like Hierarchical with mixed dissimilarity
 hclust_ccr_scores <- cbind(c(weighted_hclust_ccr_min_score,unweighted_hclust_ccr_min_score), c(weighted_hclust_ccr_selected_score,unweighted_hclust_ccr_selected_score), c(weighted_hclust_ccr_cutoff_score, unweighted_hclust_ccr_cutoff_score), c(weighted_hclust_ccr_max_score,unweighted_hclust_ccr_max_score), c(K_hclust/2, K_hclust/2), c(hclust_Weighted_Design_result$overall_allocations[3], hclust_Unweighted_Design_result$overall_allocations[3]))
 rownames(hclust_ccr_scores) <- c("H-Clust Weighted", "H-Clust Unweighted")
 colnames(hclust_ccr_scores) <- c("Minimum Score", "Selected Balance Score", "10% Cutoff Score", "Maximum Score", "Number of Clusters in Each Treatment Arm", "Number of Allocations in Randomization Space")
@@ -1319,11 +1386,10 @@ In terms of selected balance score, the top four performers were: CLARA with wei
 
 ###CCR Treatment Arm Contiguity (Measured with Mean Nearest Neighbor Distance)
 
-####Study 1
 
 ```{r, echo=F, message=F, warning=F}
 #Weighted
-#kmeans
+#K-Means
 weighted_kmeans_nndistCIs_k1 <- rbind(Weighted_kmeans_treatment_0_nndistCI_k1, Weighted_kmeans_treatment_1_nndistCI_k1)
 rownames(weighted_kmeans_nndistCIs_k1) <- c("K-means with Weighted CCR: Treatment 0", "K-means with Weighted CCR: Treatment 1")
 colnames(weighted_kmeans_nndistCIs_k1) <- c("Mean Nearest Neighbor Distance (k = 1)", "CI lower", "CI upper", "Std. Error")
@@ -1332,7 +1398,7 @@ weighted_kmeans_different_meanNNdists_k1 <- as.matrix(Weighted_kmeans_different_
 rownames(weighted_kmeans_different_meanNNdists_k1) <- "Weighted K-Means"
 colnames(weighted_kmeans_different_meanNNdists_k1) <- "Difference in cluster spatial variability (k = 1)? (0 = No, 1 = Yes)"
 
-#clara
+#CLARA
 weighted_clara_nndistCIs_k1 <- rbind(Weighted_clara_treatment_0_nndistCI_k1, Weighted_clara_treatment_1_nndistCI_k1)
 rownames(weighted_clara_nndistCIs_k1) <- c("CLARA with Weighted CCR: Treatment 0", "CLARA with Weighted CCR: Treatment 1")
 colnames(weighted_clara_nndistCIs_k1) <- c("Mean Nearest Neighbor Distance (k = 1)", "CI lower", "CI upper", "Std. Error")
@@ -1341,7 +1407,7 @@ weighted_clara_different_meanNNdists_k1 <- as.matrix(Weighted_clara_different_me
 rownames(weighted_clara_different_meanNNdists_k1) <- "Weighted CLARA"
 colnames(weighted_clara_different_meanNNdists_k1) <- "Difference in cluster spatial variability (k = 1)? (0 = No, 1 = Yes)"
 
-#hclust - geo. only
+#Hierarchical - geographic location only
 weighted_hclust_geo_nndistCIs_k1 <- rbind(Weighted_hclust_geo_treatment_0_nndistCI_k1, Weighted_hclust_geo_treatment_1_nndistCI_k1)
 rownames(weighted_hclust_geo_nndistCIs_k1) <- c("Hierarchical with Weighted CCR - Geo. Only: Treatment 0", "Hierarchical with Weighted CCR - Geo. Only: Treatment 1")
 colnames(weighted_hclust_geo_nndistCIs_k1) <- c("Mean Nearest Neighbor Distance (k = 1)", "CI lower", "CI upper", "Std. Error")
@@ -1350,7 +1416,7 @@ weighted_hclust_geo_different_meanNNdists_k1 <- as.matrix(Weighted_hclust_geo_di
 rownames(weighted_hclust_geo_different_meanNNdists_k1) <- "Weighted Hierarchical - Geo. Only"
 colnames(weighted_hclust_geo_different_meanNNdists_k1) <- "Difference in cluster spatial variability (k = 1)? (0 = No, 1 = Yes)"
 
-#hclust
+#Ward-like Hierarchical with mixed dissimilarity
 weighted_hclust_nndistCIs_k1 <- rbind(Weighted_hclust_treatment_0_nndistCI_k1, Weighted_hclust_treatment_1_nndistCI_k1)
 rownames(weighted_hclust_nndistCIs_k1) <- c("Hierarchical with Weighted CCR: Treatment 0", "Hierarchical with Weighted CCR: Treatment 1")
 colnames(weighted_hclust_nndistCIs_k1) <- c("Mean Nearest Neighbor Distance (k = 1)", "CI lower", "CI upper", "Std. Error")
@@ -1359,9 +1425,8 @@ weighted_hclust_different_meanNNdists_k1 <- as.matrix(Weighted_hclust_different_
 rownames(weighted_hclust_different_meanNNdists_k1) <- "Weighted Hierarchical"
 colnames(weighted_hclust_different_meanNNdists_k1) <- "Difference in cluster spatial variability (k = 1)? (0 = No, 1 = Yes)"
 
-
 #Unweighted
-#kmeans
+#K-Means
 unweighted_kmeans_nndistCIs_k1 <- rbind(Unweighted_kmeans_treatment_0_nndistCI_k1, Unweighted_kmeans_treatment_1_nndistCI_k1)
 rownames(unweighted_kmeans_nndistCIs_k1) <- c("K-means with Unweighted CCR: Treatment 0", "K-means with Unweighted CCR: Treatment 1")
 colnames(unweighted_kmeans_nndistCIs_k1) <- c("Mean Nearest Neighbor Distance (k = 1)", "CI lower", "CI upper", "Std. Error")
@@ -1370,7 +1435,7 @@ unweighted_kmeans_different_meanNNdists_k1 <- as.matrix(Unweighted_kmeans_differ
 row.names(unweighted_kmeans_different_meanNNdists_k1) <- "Unweighted K-Means"
 colnames(unweighted_kmeans_different_meanNNdists_k1) <- "Difference in cluster spatial variability (k = 1)? (0 = No, 1 = Yes)"
 
-#clara
+#CLARA
 unweighted_clara_nndistCIs_k1 <- rbind(Unweighted_clara_treatment_0_nndistCI_k1, Unweighted_clara_treatment_1_nndistCI_k1)
 rownames(unweighted_clara_nndistCIs_k1) <- c("CLARA with Unweighted CCR: Treatment 0", "CLARA with Unweighted CCR: Treatment 1")
 colnames(unweighted_clara_nndistCIs_k1) <- c("Mean Nearest Neighbor Distance (k = 1)", "CI lower", "CI upper", "Std. Error")
@@ -1379,7 +1444,7 @@ unweighted_clara_different_meanNNdists_k1 <- as.matrix(Unweighted_clara_differen
 row.names(unweighted_clara_different_meanNNdists_k1) <- "Unweighted CLARA"
 colnames(unweighted_clara_different_meanNNdists_k1) <- "Difference in cluster spatial variability (k = 1)? (0 = No, 1 = Yes)"
 
-#hclust euclidean
+#Hierarchical - geographic location only
 unweighted_hclust_geo_nndistCIs_k1 <- rbind(Unweighted_hclust_geo_treatment_0_nndistCI_k1, Unweighted_hclust_geo_treatment_1_nndistCI_k1)
 rownames(unweighted_hclust_geo_nndistCIs_k1) <- c("Hierarchical with Unweighted CCR: Treatment 0", "Hierarchical with Unweighted CCR: Treatment 1")
 colnames(unweighted_hclust_geo_nndistCIs_k1) <- c("Mean Nearest Neighbor Distance (k = 1)", "CI lower", "CI upper", "Std. Error")
@@ -1388,7 +1453,7 @@ unweighted_hclust_geo_different_meanNNdists_k1 <- as.matrix(Unweighted_hclust_ge
 row.names(unweighted_hclust_geo_different_meanNNdists_k1) <- "Unweighted Hierarchical - Geo. Only"
 colnames(unweighted_hclust_geo_different_meanNNdists_k1) <- "Difference in cluster spatial variability (k = 1)? (0 = No, 1 = Yes)"
 
-#hclust both
+#Ward-like Hierarchical with mixed dissimilarity
 unweighted_hclust_nndistCIs_k1 <- rbind(Unweighted_hclust_treatment_0_nndistCI_k1, Unweighted_hclust_treatment_1_nndistCI_k1)
 rownames(unweighted_hclust_nndistCIs_k1) <- c("Hierarchical with Unweighted CCR: Treatment 0", "Hierarchical with Unweighted CCR: Treatment 1")
 colnames(unweighted_hclust_nndistCIs_k1) <- c("Mean Nearest Neighbor Distance (k = 1)", "CI lower", "CI upper", "Std. Error")
@@ -1414,25 +1479,25 @@ At significance level alpha = 0.05, the CCR allocations that resulted in signifi
 ### CPU Run Times
 
 ```{r, echo=F, message=F, warning=F}
-#kmeans
+#K-Means
 kmeans_runtimes <- c(K_means_selection_time,  Weighted_K_means_ccr_time, Unweighted_K_means_ccr_time)
 kmeans_runtimes <- as.matrix(kmeans_runtimes)
 rownames(kmeans_runtimes) <- c("Optimizing Clusters", "Weighted CCR", "Unweighted CCR")
 colnames(kmeans_runtimes) <- "K-Means Time (seconds)"
 
-#clara
+#CLARA
 clara_runtimes <- c(clara_selection_time, Weighted_clara_ccr_time, Unweighted_clara_ccr_time)
 clara_runtimes <- as.matrix(clara_runtimes)
 rownames(clara_runtimes) <- c("Optimizing Clusters",  "Weighted CCR", "Unweighted CCR")
 colnames(clara_runtimes) <- "CLARA Time (seconds)"
 
-#hclust euclidean
+#Hierarchical - geographic location only
 hclust_geo_runtimes <- c(hclust_geo_selection_time, Weighted_hclust_geo_ccr_time, Unweighted_hclust_geo_ccr_time)
 hclust_geo_runtimes <- as.matrix(hclust_geo_runtimes)
 rownames(hclust_geo_runtimes) <- c("Optimizing Clusters", "Weighted CCR", "Unweighted CCR")
 colnames(hclust_geo_runtimes) <- "H-Clust Geo. Time (seconds)"
 
-#hclust both
+#Ward-like Hierarchical with mixed dissimilarity
 hclust_runtimes <- c(hclust_selection_time, Weighted_hclust_ccr_time, Unweighted_hclust_ccr_time)
 hclust_runtimes <- as.matrix(hclust_runtimes)
 rownames(hclust_runtimes) <- c("Optimizing Clusters", "Weighted CCR", "Unweighted CCR")
