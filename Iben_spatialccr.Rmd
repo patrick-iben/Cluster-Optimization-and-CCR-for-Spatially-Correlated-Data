@@ -1,7 +1,7 @@
 ---
 title: Cluster Assignment and Covariate-Constrained Randomization for Spatially-Correlated Data
 author: "Patrick Iben"
-date: "October 13, 2019"
+date: "October 26, 2019"
 output:
   html_document: default
   pdf_document: default
@@ -271,6 +271,7 @@ study_data_wide <- merge(K_kmeans_clustering, study_data_wide,by = "village_code
 #Visualizing clusters
 sp::plot(map,border="grey",col=K_kmeans_clustering, main= "12-Cluster Partition Obtained with K-Means on Centroid Euclidean Distance",cex.main=1)
 legend("left", legend=paste("Cluster",1:K_kmeans), fill=1:K_kmeans, bty="n",border="white")
+text(coordinates(map), labels = K_kmeans_clustering[,1])
 
 #Black and white visualization of clustering scheme
 #plot(map, main= "12-Cluster Partition Obtained with K-Means on Centroid Euclidean Distance",cex.main=1 )
@@ -557,6 +558,7 @@ study_data_wide <- merge(K_clara_clustering, study_data_wide,by = "village_code"
 #Visualizing clusters
 sp::plot(map,border="grey",col=K_clara_clustering, main= "8-Cluster Partition Obtained with CLARA on Centroid Euclidean Distance",cex.main=1)
 legend("bottomleft", legend=paste("Cluster",1:K_clara), fill=1:K_clara, bty="n",border="grey")
+text(coordinates(map), labels = K_clara_clustering[,1])
 
 #Black and white
 #plot(map, main="8-Cluster Partition Obtained with CLARA on Centroid Euclidean Distance" ,cex.main=1)
@@ -1574,7 +1576,7 @@ legend("bottomleft", legend=paste("Treatment",1:2), fill=0:1, bty="n",border="gr
 
 ###Conclusions
 
-Strategic weighting of covariates during CCR, regardless of clustering method, served to drastically improve covariate balance during randomization into CRT treatment arms. In terms of minimizing covariate imbalance, Ward-like hierarchical using only geographic location (Euclidean distance) and weighting during CCR appears to perform better than the more complicated, and more computationally-intensive, mixed-dissimilarity method. For CRT design using Ward-like hierarchical clustering with weighted CCR, this added level of sophistication may be unnecessary. Clustering on geographic location - with weighting during CCR - may sufficiently balance treatment arms with respect to important spatial feature data.
+Strategic weighting of covariates during CCR, regardless of clustering method, served to drastically improve covariate balance during randomization into CRT treatment arms. In terms of minimizing covariate imbalance, Ward-like hierarchical using only geographic location (Euclidean distance) and weighting during CCR appears to perform better than the more complicated, and more computationally-intensive, mixed-dissimilarity method. For CRT design using Ward-like hierarchical clustering with weighted CCR, this added level of sophistication may be unnecessary. Clustering on geographic location - with informed weighting during CCR - may sufficiently balance treatment arms with respect to important spatial feature data. For some studies, if a straight-line path is not possible (e.g., a grid of city streets), it may be impractical to use Euclidean distance between units. For such a scenario, using Manhattan distance is preferable; however, it should be noted that K-means gives better results (i.e., less distortion) when using Euclidean distance [12].
 
 Based on 10% cutoff balance scores and CPU run times, either CLARA with weighted CCR or Ward-Like Hierarchical Clustering with Euclidean geographical dissimilarities and weighted CCR may be considered optimal study design strategies. Ward-Like Hierarchical Clustering with Euclidean geographical dissimilarities and weighted CCR maintained spatial heterogeneity of treatment assignments. Thus, for this data scenario, Ward-Like Hierarchical Clustering with Euclidean geographical dissimilarities and weighted CCR performed optimally (i.e., optimized covariate balance while maintaining spatial heterogeneity of treatment assignments).
 
@@ -1582,11 +1584,11 @@ In this paper, we presented a stepwise methodological approach to mitigating cov
 
 ###Limitations
 
-For simplicity, the only cluster quality statistic used to optimize clustering methods was average silhouette width. It may be of interest to examine additional, potential cluster quality statistics that are applicable for clustering on a variety of data types (e.g., numerical, nominal, ordinal). Furthermore, "ClustGeo" limits the maximum number of clusters to 55; this may be impractical for some large CRT studies. For large CRTs, K-Means or CLARA with weighted CCR may be preferable to Ward-Like hierarchical clustering.
+For simplicity, the only cluster quality statistic used to optimize clustering methods was average silhouette width. It may be of interest to examine additional, potential cluster quality statistics that are applicable for clustering on a variety of data types (e.g., numerical, nominal, ordinal). Furthermore, "ClustGeo" limits the maximum number of clusters to 55; this may be impractical for some large CRT studies. For large CRTs, K-Means or CLARA with weighted CCR may be preferable to Ward-Like hierarchical clustering. 
 
 Clustering and treatment assignments, as well as conclusions on spatial heterogeneity of treatment assignments, may be influenced by geographical barriers between units (e.g., mountains, canyons, swamps). These barriers may prevent spatial contamination of subjects across units, but they were not considered in the applications presented here.
 
-Unlike the spatial clustering methods outlined here, density-based spatial clustering methods (e.g., DBSCAN) can detect clusters of arbitrary shape [12]. As the geographic region for this and many studies is oblong, and not uniformly- distributed, such an algorithm may be of use for assigning units to CRT treatment arms. Unfortunately, as it is not a hard clustering algorithm and may result in some units belonging to multiple or no clusters, density-based clustering was not considered in this example.
+Unlike the spatial clustering methods outlined here, density-based spatial clustering methods (e.g., DBSCAN) can detect clusters of arbitrary shape [13]. As the geographic region for this and many studies is oblong, and not uniformly- distributed, such an algorithm may be of use for assigning units to CRT treatment arms. Unfortunately, as it is not a hard clustering algorithm and may result in some units belonging to multiple or no clusters, density-based clustering was not considered in this example.
 
 ###References
 
@@ -1596,7 +1598,7 @@ Unlike the spatial clustering methods outlined here, density-based spatial clust
 
 3.  Roger S. Bivand, Edzer Pebesma, Virgilio Gomez-Rubio. (2013). Applied spatial data analysis with R, Second edition. Springer, NY. http://www.asdar-book.org/.
 
-4.  H. Wickham. (2016). ggplot2: Elegant Graphics for Data Analysis. Springer-Verlag New York.
+4. H. Wickham. (2016). ggplot2: Elegant Graphics for Data Analysis. Springer-Verlag New York.
 
 5. Studer, Matthias (2013). WeightedCluster Library Manual: A practical guide to creating typologies of trajectories in the social sciences with R. LIVES Working Papers, 24. DOI: 10.12682/lives.2296-1658.2013.24.
 
@@ -1612,4 +1614,6 @@ Unlike the spatial clustering methods outlined here, density-based spatial clust
 
 11. Gower J. C. (1971). A general coefficient of similarity and some of its properties. Biometrics. 27, 857-872.
 
-12. Ram A, Jalal S, Jalal AS, Kumar M. (2010). A Density Based Algorithm for Discovering Density Varied Clusters in Large Spatial Databases. International Journal of Computer Applications. 3(6):1-4.
+12. Singh, A., Yadav, A., & Rana, A. (2013). K-means with Three different Distance Metrics. International Journal of Computer Applications, 67(10), 13–17. doi: 10.5120/11430-6785
+
+13. Ram A, Jalal S, Jalal AS, Kumar M. (2010). A Density Based Algorithm for Discovering Density Varied Clusters in Large Spatial Databases. International Journal of Computer Applications. 3(6):1-4.
