@@ -1,7 +1,7 @@
 ---
 title: Cluster Assignment and Covariate-Constrained Randomization for Spatially-Correlated Data
 author: "Patrick Iben"
-date: "October 26, 2019"
+date: "November 23, 2019"
 output:
   html_document: default
   pdf_document: default
@@ -11,7 +11,7 @@ output:
 
 Cluster randomized trials (CRTs) are commonly implemented when treatments cannot be randomized to individuals. However, randomization of clusters often results in imbalance with respect to important confounders. To circumvent this imbalance, researchers have applied constraints to the covariate make-up of the clusters so that imbalance is minimized, so-called covariate-based constrained randomization (CCR) [1]. Briefly, in CCR, constraints are applied to all possible randomizations, and among those that satisfy these constraints one is chosen at random.
 
-The purpose of this tutorial is to guide developers of randomized clinical trials through the assignment of units to clusters, and clusters to treatment arms via covariate-constrained randomization. For robustness and evaluation of scalability, mixed covariate data types (e.g., numerical, categorical) from both small and large-scale real-world data scenarios are utilized for the optimization, creation, and assignment of clusters. Three popular clustering algorithms currently implemented in R are used and compared: K-means, Clustering Large Applications (CLARA), and Ward-like hierarchical clustering. The algorithms are compared with respect to their: resultant degree of cluster covariate imbalance after CCR assignment (both weighted and unweighted); overall spatial contiguity of treatment arms after CCR; and CPU run times for each major stage of the process - cluster optimization, weighted CCR and unweighted CCR. 
+The purpose of this tutorial is to guide developers of randomized clinical trials through the assignment of units to clusters, and clusters to treatment arms via covariate-constrained randomization. For robustness and evaluation of scalability, mixed covariate data types (e.g., numerical, categorical) from both small and large-scale real-world data scenarios are utilized for the optimization, creation, and assignment of clusters. Three popular clustering algorithms currently implemented in R are used and compared: K-means, Clustering Large Applications (CLARA), and Ward-like hierarchical clustering. The algorithms are compared with respect to their: resultant degree of cluster covariate imbalance after CCR assignment (both weighted and unweighted); overall spatial contiguity of treatment arms after CCR; and CPU run times for cluster optimization and CCR (weighted and unweighted). 
 
 ###Methodology
 
@@ -280,7 +280,7 @@ text(coordinates(map), labels = K_kmeans_clustering[,1])
 
 #####CCR
 
-"cvcrand" allows for custom weighting of covariate importance while performing CCR. For this example, we use standardized regression coefficients from a Poisson cell-means model with an offset via the glm() function. We are using standardized village-level data (due to the sparsity of cluster-level data); to standardize the data, the scale() function is used. The regression coefficients are standardized such that their absolute values sum to 1 - the relative weight of a given covariate is defined as the absolute value of its model coefficient divided by the sum of the absolute values of all model coefficients. 
+"cvcrand" allows for custom weighting of covariate importance while performing CCR. For this example, we use standardized regression coefficients from a Poisson cell-means model with an offset via the glm() function. We are using standardized village-level data (due to the sparsity of cluster-level data); to standardize the data, the scale() function is used. The regression coefficients are standardized such that their absolute values sum to 1 - the relative weight of a given covariate is defined as the absolute value of its model coefficient divided by the sum of the absolute values of all model coefficients. To keep consistent with package author guidelines of weights greater than 1, each weight is then multiplied by 10.
 
 ```{r, echo=T, message=F, warning=F}
 #Scaling covariates (not outcome or offset)
@@ -294,7 +294,9 @@ weight_model <- glm(microPos_5 ~ scaled_microPos_1 + scaled_BordersWater + scale
 summary(weight_model)
 
 #Scaling and saving model coefficients for CCR weights
-weights <- c(abs(weight_model$coefficients[1][[1]])/sum(abs(weight_model$coefficients)), abs(weight_model$coefficients[2][[1]])/sum(abs(weight_model$coefficients)), abs(weight_model$coefficients[3][[1]])/sum(abs(weight_model$coefficients)))
+weights_raw <- c(abs(weight_model$coefficients[1][[1]])/sum(abs(weight_model$coefficients)), abs(weight_model$coefficients[2][[1]])/sum(abs(weight_model$coefficients)), abs(weight_model$coefficients[3][[1]])/sum(abs(weight_model$coefficients)))
+
+weights <- weights_raw * 10
 
 weights
 ```
@@ -1384,7 +1386,7 @@ colnames(hclust_ccr_scores) <- c("Minimum Score", "Selected Balance Score", "10%
 rbind(k_means_ccr_scores, clara_ccr_scores, hclust_geo_ccr_scores, hclust_ccr_scores)
 ```
 
-In terms of selected balance score, the top four performers were: CLARA with weighted CCR (0.093); Ward-like hierarchical clustering with weighted CCR, using geographic location (0.152); K-Means with weighted CCR (0.263); Ward-like hierarchical clustering with weighted CCR, using geographic location and covariate dissimilarity (0.283). In terms of the maximum (10%) cutoff score, the top four performers were: CLARA with weighted CCR (0.112); Ward-like hierarchical clustering with weighted CCR, using geographic location (0.185); K-Means with weighted CCR (0.299); Ward-like hierarchical clustering with weighted CCR, using geographic location and covariate dissimilarity (0.325).
+In terms of selected balance score, the top three performers for weighted CCR were: CLARA (9.297); Ward-like hierarchical clustering, using geographic location (15.198); and K-Means (26.295). The top three performers for unweighted CCR were: CLARA (0.776); Ward-like hierarchical clustering, using geographic location (1.632); and Ward-like hierarchical clustering, using mixed dissimilarities (1.886). In terms of the maximum (10%) cutoff score, the top three performers for weighted CCR were: CLARA (11.158); Ward-like hierarchical clustering, using geographic location (18.469); and K-Means (29.857). The top three performers for unweighted CCR were: CLARA (1.767); Ward-like hierarchical clustering, using geographic location (2.002); and Ward-like hierarchical clustering, using mixed dissimilarities (1.886).
 
 ###CCR Treatment Arm Contiguity (Measured with Mean Nearest Neighbor Distance)
 
@@ -1520,11 +1522,10 @@ In terms of CPU run times, Ward-like hierarchical clustering with mixed dissimil
 #Visualizing clusters
 sp::plot(map,border="grey",col=K_kmeans_clustering[,1], main= "12-Cluster Partition Obtained with K-Means on Centroid Euclidean Distance",cex.main=1)
 legend("left", legend=paste("Cluster",1:K_kmeans), fill=1:K_kmeans, bty="n",border="grey")
-
+text(coordinates(map), labels = K_kmeans_clustering[,1])
 #Weighted CCR
 sp::plot(map,border="grey",col= Kmeans_clusters_weighted_ccr_1[,1], main= "Treatment Allocations Obtained with K-Means and Weighted CCR",cex.main=1)
 legend("bottomleft", legend=paste("Treatment",1:2), fill=0:1, bty="n",border="grey")
-
 #Unweighted CCR
 sp::plot(map,border="grey",col=Kmeans_clusters_unweighted_ccr_1[,1], main= "Treatment Allocations Obtained with K-Means and Unweighted CCR",cex.main=1)
 legend("bottomleft", legend=paste("Treatment",1:2), fill=0:1, bty="n",border="grey")
@@ -1536,11 +1537,10 @@ legend("bottomleft", legend=paste("Treatment",1:2), fill=0:1, bty="n",border="gr
 #Visualizing clusters
 sp::plot(map,border="grey",col=K_clara_clustering[,1], main= "8-Cluster Partition Obtained with CLARA on Centroid Euclidean Distance",cex.main=1)
 legend("bottomleft", legend=paste("Cluster",1:K_clara), fill=1:K_clara, bty="n",border="grey")
-
+text(coordinates(map), labels = K_clara_clustering[,1])
 #Weighted CCR
 sp::plot(map,border="grey",col=clara_clusters_weighted_ccr_1[,1], main= "Treatment allocations Obtained with CLARA Clustering, Weighted CCR",cex.main=1)
 legend("bottomleft", legend=paste("Treatment",1:2), fill=0:1, bty="n",border="grey")
-
 #Unweighted CCR
 sp::plot(map,border="grey",col=clara_clusters_unweighted_ccr_1[,1], main= "Treatment allocations Obtained with CLARA Clustering, Unweighted CCR",cex.main=1)
 legend("bottomleft", legend=paste("Treatment",1:2), fill=0:1, bty="n",border="grey")
@@ -1552,6 +1552,7 @@ legend("bottomleft", legend=paste("Treatment",1:2), fill=0:1, bty="n",border="gr
 #Plotting clusters
 sp::plot(map,border="grey",col=PKbis_geo, main= "Ward-Like Hierarchical Clustering of Size 12 Obtained with Geographic Location \n (alpha=1)",cex.main=1)
 legend("topleft", legend=paste("Cluster",1:max(PKbis_geo)), fill=1:max(PKbis_geo), bty="n",border="grey")
+text(coordinates(map), labels = PKbis_geo, cex = 2)
 #Weighted CCR
 sp::plot(map,border="grey",col=hclust_geo_clusters_weighted_ccr_1[,1], main= "Treatment Allocations Obtained with \n Ward-Like Hierarchical Clustering, Weighted CCR - Geographic Location Only",cex.main=1)
 legend("bottomleft", legend=paste("Treatment",1:2), fill=0:1, bty="n",border="grey")
@@ -1566,6 +1567,7 @@ legend("bottomleft", legend=paste("Treatment",1:2), fill=0:1, bty="n",border="gr
 #Plotting clusters
 sp::plot(map,border="grey",col=PKbis, main= "Ward-Like Hierarchical Clustering of Size 18 Obtained with alpha=0.6",cex.main=1)
 legend("topleft", legend=paste("Cluster",1:max(PKbis)), fill=1:max(PKbis), bty="n",border="grey", cex = .8)
+text(coordinates(map), labels = PKbis)
 #Weighted CCR
 sp::plot(map,border="grey",col=hclust_clusters_weighted_ccr_1[,1], main= "Treatment Allocations Obtained with \n Ward-Like Hierarchical Clustering, Weighted CCR",cex.main=1)
 legend("bottomleft", legend=paste("Treatment",1:2), fill=0:1, bty="n",border="grey")
@@ -1576,15 +1578,15 @@ legend("bottomleft", legend=paste("Treatment",1:2), fill=0:1, bty="n",border="gr
 
 ###Conclusions
 
-Strategic weighting of covariates during CCR, regardless of clustering method, served to drastically improve covariate balance during randomization into CRT treatment arms. In terms of minimizing covariate imbalance, Ward-like hierarchical using only geographic location (Euclidean distance) and weighting during CCR appears to perform better than the more complicated, and more computationally-intensive, mixed-dissimilarity method. For CRT design using Ward-like hierarchical clustering with weighted CCR, this added level of sophistication may be unnecessary. Clustering on geographic location - with informed weighting during CCR - may sufficiently balance treatment arms with respect to important spatial feature data. For some studies, if a straight-line path is not possible (e.g., a grid of city streets), it may be impractical to use Euclidean distance between units. For such a scenario, using Manhattan distance is preferable; however, it should be noted that K-means gives better results (i.e., less distortion) when using Euclidean distance [12].
+In terms of minimizing covariate imbalance, Ward-like hierarchical using only geographic location (Euclidean distance) and weighting during CCR appears to perform better than the more complicated, and more computationally-intensive, mixed-dissimilarity method. For CRT design using Ward-like hierarchical clustering with weighted CCR, this added level of sophistication may be unnecessary. Clustering on geographic location may sufficiently balance treatment arms with respect to important spatial feature data. For some studies, if a straight-line path is not possible (e.g., a grid of city streets), it may be impractical to use Euclidean distance between units. For such a scenario, using Manhattan distance is preferable; however, it should be noted that K-means gives better results (i.e., less distortion) when using Euclidean distance [12].
 
-Based on 10% cutoff balance scores and CPU run times, either CLARA with weighted CCR or Ward-Like Hierarchical Clustering with Euclidean geographical dissimilarities and weighted CCR may be considered optimal study design strategies. Ward-Like Hierarchical Clustering with Euclidean geographical dissimilarities and weighted CCR maintained spatial heterogeneity of treatment assignments. Thus, for this data scenario, Ward-Like Hierarchical Clustering with Euclidean geographical dissimilarities and weighted CCR performed optimally (i.e., optimized covariate balance while maintaining spatial heterogeneity of treatment assignments).
+Based on 10% cutoff balance scores and CPU run times, either CLARA with weighted CCR or Ward-Like Hierarchical Clustering with Euclidean geographical dissimilarities and weighted CCR may be considered optimal study design strategies for this data scenario. Ward-Like Hierarchical Clustering with Euclidean geographical dissimilarities and weighted CCR maintained spatial heterogeneity of treatment assignments. Thus, for this data scenario, Ward-Like Hierarchical Clustering with Euclidean geographical dissimilarities and weighted CCR performed optimally (i.e., optimized covariate balance while maintaining spatial heterogeneity of treatment assignments).
 
-In this paper, we presented a stepwise methodological approach to mitigating covariate imbalance and intervention contamination in a CRT. Future enhancements to this approach might include optimization of covariate imbalance and spatial clustering of intervention arms simultaneously.
+In this paper, we presented a stepwise methodological approach to mitigating covariate imbalance and intervention contamination in a CRT. This approach cannot ensure that only treatment assignments exhibiting spatial heterogeneity are randomly selected from. Future enhancements to this approach might include optimization of covariate imbalance and spatial clustering of intervention arms simultaneously.
 
 ###Limitations
 
-For simplicity, the only cluster quality statistic used to optimize clustering methods was average silhouette width. It may be of interest to examine additional, potential cluster quality statistics that are applicable for clustering on a variety of data types (e.g., numerical, nominal, ordinal). Furthermore, "ClustGeo" limits the maximum number of clusters to 55; this may be impractical for some large CRT studies. For large CRTs, K-Means or CLARA with weighted CCR may be preferable to Ward-Like hierarchical clustering. 
+For simplicity, the only cluster quality statistic used to optimize clustering methods was average silhouette width. It may be of interest to examine additional, potential cluster quality statistics that are applicable for clustering on a variety of data types (e.g., numerical, nominal, ordinal). Furthermore, "ClustGeo" limits the maximum number of clusters to 55; this may be impractical for some large CRT studies. For large CRTs, K-Means or CLARA - or an alternate method of hierarchical clustering - may be preferable to Ward-Like hierarchical clustering with "ClustGeo". 
 
 Clustering and treatment assignments, as well as conclusions on spatial heterogeneity of treatment assignments, may be influenced by geographical barriers between units (e.g., mountains, canyons, swamps). These barriers may prevent spatial contamination of subjects across units, but they were not considered in the applications presented here.
 
@@ -1614,6 +1616,6 @@ Unlike the spatial clustering methods outlined here, density-based spatial clust
 
 11. Gower J. C. (1971). A general coefficient of similarity and some of its properties. Biometrics. 27, 857-872.
 
-12. Singh, A., Yadav, A., & Rana, A. (2013). K-means with Three different Distance Metrics. International Journal of Computer Applications, 67(10), 13–17. doi: 10.5120/11430-6785
+12. Singh, A., Yadav, A., & Rana, A. (2013). K-means with Three different Distance Metrics. International Journal of Computer Applications, 67(10), 13-17. doi: 10.5120/11430-6785
 
 13. Ram A, Jalal S, Jalal AS, Kumar M. (2010). A Density Based Algorithm for Discovering Density Varied Clusters in Large Spatial Databases. International Journal of Computer Applications. 3(6):1-4.
