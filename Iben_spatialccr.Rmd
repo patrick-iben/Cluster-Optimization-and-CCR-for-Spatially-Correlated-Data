@@ -1,7 +1,7 @@
 ---
 title: Cluster Assignment and Covariate-Constrained Randomization for Spatially-Correlated Data
 author: "Patrick Iben"
-date: "November 23, 2019"
+date: "December 13, 2019"
 output:
   html_document: default
   pdf_document: default
@@ -1466,7 +1466,6 @@ unweighted_hclust_different_meanNNdists_k1 <- as.matrix(Unweighted_hclust_differ
 row.names(unweighted_hclust_different_meanNNdists_k1) <- "Unweighted Hierarchical"
 colnames(unweighted_hclust_different_meanNNdists_k1) <- "Difference in cluster spatial variability (k = 1)? (0 = No, 1 = Yes)"
 
-
 #Combining for display
 rbind(weighted_kmeans_nndistCIs_k1, unweighted_kmeans_nndistCIs_k1, weighted_clara_nndistCIs_k1, unweighted_clara_nndistCIs_k1, weighted_hclust_geo_nndistCIs_k1, unweighted_hclust_geo_nndistCIs_k1,
       weighted_hclust_nndistCIs_k1, unweighted_hclust_nndistCIs_k1)
@@ -1552,7 +1551,7 @@ legend("bottomleft", legend=paste("Treatment",1:2), fill=0:1, bty="n",border="gr
 #Plotting clusters
 sp::plot(map,border="grey",col=PKbis_geo, main= "Ward-Like Hierarchical Clustering of Size 12 Obtained with Geographic Location \n (alpha=1)",cex.main=1)
 legend("topleft", legend=paste("Cluster",1:max(PKbis_geo)), fill=1:max(PKbis_geo), bty="n",border="grey")
-text(coordinates(map), labels = PKbis_geo, cex = 2)
+text(coordinates(map), labels = PKbis_geo)
 #Weighted CCR
 sp::plot(map,border="grey",col=hclust_geo_clusters_weighted_ccr_1[,1], main= "Treatment Allocations Obtained with \n Ward-Like Hierarchical Clustering, Weighted CCR - Geographic Location Only",cex.main=1)
 legend("bottomleft", legend=paste("Treatment",1:2), fill=0:1, bty="n",border="grey")
@@ -1578,9 +1577,9 @@ legend("bottomleft", legend=paste("Treatment",1:2), fill=0:1, bty="n",border="gr
 
 ###Conclusions
 
-In terms of minimizing covariate imbalance, Ward-like hierarchical using only geographic location (Euclidean distance) and weighting during CCR appears to perform better than the more complicated, and more computationally-intensive, mixed-dissimilarity method. For CRT design using Ward-like hierarchical clustering with weighted CCR, this added level of sophistication may be unnecessary. Clustering on geographic location may sufficiently balance treatment arms with respect to important spatial feature data. For some studies, if a straight-line path is not possible (e.g., a grid of city streets), it may be impractical to use Euclidean distance between units. For such a scenario, using Manhattan distance is preferable; however, it should be noted that K-means gives better results (i.e., less distortion) when using Euclidean distance [12].
+In terms of minimizing covariate imbalance, Ward-like hierarchical using only geographic location (Euclidean distance) and weighting during CCR appears to perform better than the more complicated, and more computationally-intensive, mixed-dissimilarity method. For CRT design using Ward-like hierarchical clustering with weighted CCR, this added level of sophistication may be unnecessary. Clustering on geographic location, then performing CCR, may sufficiently balance treatment arms with respect to important spatial feature data. For some studies, if a straight-line path is not possible (e.g., a grid of city streets), it may be impractical to use Euclidean distance between units. For such a scenario, using Manhattan distance is preferable; however, it should be noted that K-means gives better results (i.e., less distortion) when using Euclidean distance [12].
 
-Based on 10% cutoff balance scores and CPU run times, either CLARA with weighted CCR or Ward-Like Hierarchical Clustering with Euclidean geographical dissimilarities and weighted CCR may be considered optimal study design strategies for this data scenario. Ward-Like Hierarchical Clustering with Euclidean geographical dissimilarities and weighted CCR maintained spatial heterogeneity of treatment assignments. Thus, for this data scenario, Ward-Like Hierarchical Clustering with Euclidean geographical dissimilarities and weighted CCR performed optimally (i.e., optimized covariate balance while maintaining spatial heterogeneity of treatment assignments).
+For this data scenario, for both weighted and unweighted CCR, based on 10% cutoff balance scores and CPU run times, either CLARA or Ward-like hierarchical clustering with Euclidean geographical dissimilarities may be considered optimal study design strategies for ensuring covariates are roughly balanced and units within a cluster are spatially contiguous. For unweighted CCR, both selected schemes for CLARA and hierarchical maintained spatial heterogeneity of treatment assignments. CLARA had the lowest cutoff score; thus, for unweighted CCR, CLARA performed the best. For weighted CCR, only the selected scheme for hierarchical also maintained spatial heterogeneity of treatment assignments. Thus, for weighted CCR, Ward-like hierarchical clustering with Euclidean geographical dissimilarities performed the best. The cluster and treatment assignments for this method can be seen in Figure 4b. For comparison, results from a treatment allocation without spatial heterogeneity of treatment arms - Ward-like hierarchical clustering with mixed dissimilarities and weighted CCR - are provided in Figure 4d. We view 4b as a better randomization as 4d because the covariates are roughly balanced and the shapes are contiguous within arms. We view 4d as introducing a higher potential for intervention mixing. 
 
 In this paper, we presented a stepwise methodological approach to mitigating covariate imbalance and intervention contamination in a CRT. This approach cannot ensure that only treatment assignments exhibiting spatial heterogeneity are randomly selected from. Future enhancements to this approach might include optimization of covariate imbalance and spatial clustering of intervention arms simultaneously.
 
