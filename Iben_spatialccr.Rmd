@@ -38,7 +38,7 @@ emptyenv()
 rm(list=ls())
 
 ### MAPPING PACKAGES ###
-#install.packages(c("RColorBrewer", "sp", "maptools", "lattice", "latticeExtra", "rgdal","classInt", "gridExtra","ggplot2","tidyr", "cluster", "ClustGeo", "WeightedCluster", "cvcrand", "spdep", "foreign", "spatstat", "gmodels"))
+#install.packages(c("RColorBrewer", "sp", "maptools", "lattice", "latticeExtra", "rgdal","classInt", "gridExtra","ggplot2","tidyr", "cluster", "ClustGeo", "WeightedCluster", "cvcrand", "spdep", "foreign", "spatstat", "gmodels", "tools"))
 library(RColorBrewer)
 library(sp)
 library(maptools) 
@@ -46,7 +46,7 @@ library(lattice)
 library(latticeExtra)
 library(rgdal)
 library(classInt)
-require(gridExtra)
+library(gridExtra)
 library(ggplot2)
 library(tidyr)
 library(cluster)
@@ -141,13 +141,13 @@ all$rrate <- all$rdtPos/all$rdtTests
 all$village_code <- ifelse(nchar(all$village_code)<4, paste(0,all$village_code, sep = ""),all$village_code)
 
 #Adding indicator for bordering lake or wetlands
-all$BordersWater = ifelse(all$village_code %in% c('01_1', '02_1', '03_1', '04_1', '05_1', '06_1', '07_1', '08_1', '10_1', '12_1', '14_1', '16_1', '17_1', '18_1', '07_3', '08_3', '12_3', '14_3', '17_3', '19_3', '20_3', '25_3', '28_3', '29_3', '32_3', '36_3'),1,0)
+all$BordersWater <- ifelse(all$village_code %in% c('01_1', '02_1', '03_1', '04_1', '05_1', '06_1', '07_1', '08_1', '10_1', '12_1', '14_1', '16_1', '17_1', '18_1', '07_3', '08_3', '12_3', '14_3', '17_3', '19_3', '20_3', '25_3', '28_3', '29_3', '32_3', '36_3'),1,0)
 
 #Generically renaming for ease of interpretation
 study_data <- all
 
 #Ensuring sorted by hierarchy of data
-study_data<- study_data[with(study_data, order(county, village, survey)), ] 
+study_data <- study_data[with(study_data, order(county, village, survey)), ] 
 
 #Transposing long to wide
 study_data_wide <- reshape(study_data, idvar = "village_code", sep = "_", timevar = "survey", v.names = c("rdtTests","rdtPos","rrate", "microPos", "microTests", "mrate"),direction = "wide")
@@ -164,7 +164,7 @@ poly1_noMagoro <- poly1[c(1:55),]
 
 #Comparing and matching row names for merging
 #row.names(poly1_noMagoro)
-row.names(poly1_noMagoro@data) <-poly1_noMagoro@data$village_sc
+row.names(poly1_noMagoro@data) <- poly1_noMagoro@data$village_sc
 row.names(poly1_noMagoro) <- row.names(poly1_noMagoro@data)
 #row.names(study_data_wide)
 rownames(study_data_wide) <- study_data_wide$village_code
@@ -182,7 +182,7 @@ waterPal <- brewer.pal(n = 9, name = "YlGnBu")#water color scheme
 
 ####Spatial clustering method 1: K-means with Euclidean Dissimilarities
 
-K-means is one of the most widely-used methods to cluster data. Unfortunately, this algorithm is restricted to only numerical data, and thus cannot be used with mixed data types. Let us start by looking at the overall quality of the k-means clustering allocation scheme, without consideration of baseline covariate data and solely on Euclidean distance between village centroids.
+K-means is one of the most widely-used methods to cluster data. Unfortunately, this algorithm is restricted to only numerical data, and thus cannot be used with mixed data types. Let us start by looking at the overall quality of the K-means clustering allocation scheme, without consideration of baseline covariate data and solely on Euclidean distance between village centroids.
 
 First, the unit-dependent spatial variables, provided as village longitude and latitude for this example, are extracted from the shape file using the coordinates() function from the "sp" package [3].
 
@@ -191,7 +191,7 @@ First, the unit-dependent spatial variables, provided as village longitude and l
 spatial_data <- coordinates(poly1_noMagoro)
 ```
 
-The dissimilarity matrix, used to evaluate cluster quality, can be easily created using the daisy() function. For the k-means method, we are selecting the Euclidean distance metric.
+The dissimilarity matrix, used to evaluate cluster quality, can be easily created using the daisy() function. For the K-means method, we are selecting the Euclidean distance metric.
 
 ```{r, echo=T, message=F, warning=F}
 #Calculating dissimilarities between village centroids
@@ -272,7 +272,9 @@ study_data_wide <- merge(K_kmeans_clustering, study_data_wide,by = "village_code
 sp::plot(map,border="grey",col=K_kmeans_clustering, main= "12-Cluster Partition Obtained with K-Means on Centroid Euclidean Distance",cex.main=1)
 legend("left", legend=paste("Cluster",1:K_kmeans), fill=1:K_kmeans, bty="n",border="white")
 text(coordinates(map), labels = K_kmeans_clustering[,1])
+```
 
+```{r, echo=F, message=F, warning=F}
 #Black and white visualization of clustering scheme
 #plot(map, main= "12-Cluster Partition Obtained with K-Means on Centroid Euclidean Distance",cex.main=1 )
 #text(coordinates(map), labels = K_kmeans_clustering[,1])
@@ -491,9 +493,9 @@ Unweighted_kmeans_different_meanNNdists_k1 <- ifelse(Unweighted_kmeans_ttest_k1$
 
 ####Spatial clustering method 2: Clustering Large Applications (CLARA) with Euclidean Distance
 
-To perform CLARA, we use the clara() function from the "cluster" package [10]. By partitioning using an actual data point located in the middle of a group of points, as opposed to an average central location with k-means, CLARA may be less sensitive to outliers.
+To perform CLARA, we use the clara() function from the "cluster" package [10]. By partitioning using an actual data point located in the middle of a group of points, as opposed to an average central location with K-means, CLARA may be less sensitive to outliers.
 
-To determine the optimal number of clusters, the same methodology provided above for k-means is used.
+To determine the optimal number of clusters, the same methodology provided above for K-means is used.
 
 Let us re-initialize an array for our cluster quality statistic (average silhouette width), for every cluster size value to be tested. Again, we test between 6 and 18 clusters, and only even cluster sizes are considered.
 
@@ -561,7 +563,9 @@ study_data_wide <- merge(K_clara_clustering, study_data_wide,by = "village_code"
 sp::plot(map,border="grey",col=K_clara_clustering, main= "8-Cluster Partition Obtained with CLARA on Centroid Euclidean Distance",cex.main=1)
 legend("bottomleft", legend=paste("Cluster",1:K_clara), fill=1:K_clara, bty="n",border="grey")
 text(coordinates(map), labels = K_clara_clustering[,1])
+```
 
+```{r, echo=F, message=F, warning=F}
 #Black and white
 #plot(map, main="8-Cluster Partition Obtained with CLARA on Centroid Euclidean Distance" ,cex.main=1)
 #text(coordinates(map), labels = K_clara_clustering[,1])
@@ -789,7 +793,9 @@ sp_out_mrate5 <-spplot(map, c("mrate_5"),
        main = "Malaria Prevalence Rate, Survey 5", as.table = TRUE, 
        col.regions = tempPal, col = "transparent", at = seq(0, 0.5, 0.1))
 sp_out_mrate5
+```
 
+```{r, echo=F, message=F, warning=F}
 #Microscopy rate, each survey
 #sp_out_mrate <-spplot(map, c("mrate_1","mrate_2", "mrate_3", "mrate_4", "mrate_5"), 
 #      names.attr = c("Survey 1","Survey 2","Survey 3", "Survey 4", "Survey 5"), 
@@ -912,7 +918,9 @@ row.names(study_data_wide) <- study_data_wide$village_code
 sp::plot(map,border="grey",col=PKbis, main= "Ward-Like Hierarchical Clustering of Size 18 Obtained with alpha=0.6",cex.main=1)
 legend("topleft", legend=paste("Cluster",1:max(PKbis)), fill=1:max(PKbis), bty="n",border="grey", cex=0.8)
 text(coordinates(map), labels = PKbis)
+```
 
+```{r, echo=F, message=F, warning=F}
 #Black and white
 #plot(map, main="Ward-Like Hierarchical Clustering of Size 18 Obtained with alpha=0.6",cex.main=2)
 #text(coordinates(map), labels = PKbis, cex = 2)
@@ -1166,7 +1174,9 @@ row.names(study_data_wide) <- study_data_wide$village_code
 sp::plot(map,border="grey",col=PKbis_geo, main= "Ward-Like Hierarchical Clustering of Size 12 Obtained with only Geographic Location \n (alpha = 1)",cex.main=1)
 legend("topleft", legend=paste("Cluster",1:max(PKbis_geo)), fill=1:max(PKbis_geo), bty="n",border="grey")
 text(coordinates(map), labels = PKbis_geo)
+```
 
+```{r, echo=F, message=F, warning=F}
 #Black and white
 #plot(map, main="Ward-Like Hierarchical Clustering of Size 12 Obtained with only Geographic Location (alpha = 1)",cex.main=2.2)
 #text(coordinates(map), labels = PKbis_geo, cex = 2)
@@ -1395,7 +1405,7 @@ In terms of selected balance score, the top three performers for weighted CCR we
 #Weighted
 #K-Means
 weighted_kmeans_nndistCIs_k1 <- rbind(Weighted_kmeans_treatment_0_nndistCI_k1, Weighted_kmeans_treatment_1_nndistCI_k1)
-rownames(weighted_kmeans_nndistCIs_k1) <- c("K-means with Weighted CCR: Treatment 0", "K-means with Weighted CCR: Treatment 1")
+rownames(weighted_kmeans_nndistCIs_k1) <- c("K-Means with Weighted CCR: Treatment 0", "K-Means with Weighted CCR: Treatment 1")
 colnames(weighted_kmeans_nndistCIs_k1) <- c("Mean Nearest Neighbor Distance (k = 1)", "CI lower", "CI upper", "Std. Error")
 
 weighted_kmeans_different_meanNNdists_k1 <- as.matrix(Weighted_kmeans_different_meanNNdists_k1)
@@ -1432,7 +1442,7 @@ colnames(weighted_hclust_different_meanNNdists_k1) <- "Difference in cluster spa
 #Unweighted
 #K-Means
 unweighted_kmeans_nndistCIs_k1 <- rbind(Unweighted_kmeans_treatment_0_nndistCI_k1, Unweighted_kmeans_treatment_1_nndistCI_k1)
-rownames(unweighted_kmeans_nndistCIs_k1) <- c("K-means with Unweighted CCR: Treatment 0", "K-means with Unweighted CCR: Treatment 1")
+rownames(unweighted_kmeans_nndistCIs_k1) <- c("K-Means with Unweighted CCR: Treatment 0", "K-Means with Unweighted CCR: Treatment 1")
 colnames(unweighted_kmeans_nndistCIs_k1) <- c("Mean Nearest Neighbor Distance (k = 1)", "CI lower", "CI upper", "Std. Error")
 
 unweighted_kmeans_different_meanNNdists_k1 <- as.matrix(Unweighted_kmeans_different_meanNNdists_k1)
@@ -1585,7 +1595,7 @@ In this paper, we presented a stepwise methodological approach to mitigating cov
 
 ###Limitations
 
-For simplicity, the only cluster quality statistic used to optimize clustering methods was average silhouette width. It may be of interest to examine additional, potential cluster quality statistics that are applicable for clustering on a variety of data types (e.g., numerical, nominal, ordinal). Furthermore, "ClustGeo" limits the maximum number of clusters to 55; this may be impractical for some large CRT studies. For large CRTs, K-Means or CLARA - or an alternate method of hierarchical clustering - may be preferable to Ward-Like hierarchical clustering with "ClustGeo". 
+For simplicity, the only cluster quality statistic used to optimize clustering methods was average silhouette width. It may be of interest to examine additional, potential cluster quality statistics that are applicable for clustering on a variety of data types (e.g., numerical, nominal, ordinal). Furthermore, "ClustGeo" limits the maximum number of clusters to 55; this may be impractical for some large CRT studies. For large CRTs, K-means or CLARA - or an alternate method of hierarchical clustering - may be preferable to Ward-Like hierarchical clustering with "ClustGeo". 
 
 Clustering and treatment assignments, as well as conclusions on spatial heterogeneity of treatment assignments, may be influenced by geographical barriers between units (e.g., mountains, canyons, swamps). These barriers may prevent spatial contamination of subjects across units, but they were not considered in the applications presented here.
 
