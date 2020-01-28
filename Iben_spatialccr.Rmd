@@ -1,7 +1,7 @@
 ---
 title: Cluster Assignment and Covariate-Constrained Randomization for Spatially-Correlated Data
 author: "Patrick Iben"
-date: "December 13, 2019"
+date: "January 27, 2019"
 output:
   html_document: default
   pdf_document: default
@@ -15,7 +15,7 @@ The purpose of this tutorial is to guide developers of randomized clinical trial
 
 ###Methodology
 
-R is used for all data visualization, cluster assignment, and CCR. The "sp" and "ggplot2" packages are used for spatial visualization of data [2,3,4]. All calculations and their CPU run times are derived from a PC with an Intel(R) Core(TM) i7-6500U CPU @ 2.50 GHz processor and 16.0GB of RAM, running Windows 10 on an x64-based processor and R v.3.5.3 (64-Bit).
+R is used for all data visualization, cluster assignment, and CCR. The "sp" and "ggplot2" packages are used for spatial visualization of data [2,3,4]. All calculations and their CPU run times are derived from a PC with an Intel(R) Core(TM) i7-6500U CPU @ 2.50 GHz processor and 16.0GB of RAM, running Windows 10 on an x64-based processor and R v.3.6.2 (64-Bit).
 
 For K-means, CLARA, and Hierarchical clustering with geographical dissimilarities, optimal clustering number is determined with the wcClusterQuality() function from the "WeightedCluster" package [5]. For Hierarchical clustering with both covariate and geographical dissimilarities, optimal clustering number is determined with the "ClustGeo" package [6]. To measure covariate and geographical dissimilarity between units, and to accommodate mixed data types, the daisy() function in the "cluster" package is used [7].
 
@@ -60,7 +60,7 @@ library(gmodels)
 library(tools)
 
 #Setting working directory for village-level spatial feature data
-setwd('C:/Users/Patrick/Documents/CCR/CCR/')
+choose.dir()
 
 #Reading in village data
 vill <- read.csv('study_by_village.csv')
@@ -1373,22 +1373,22 @@ Unweighted_hclust_geo_different_meanNNdists_k1 <- ifelse(Unweighted_hclust_geo_t
 
 ```{r, echo=F, message=F, warning=F}
 #K-Means
-k_means_ccr_scores <- cbind(c(weighted_kmeans_ccr_min_score,unweighted_kmeans_ccr_min_score), c(weighted_kmeans_ccr_selected_score,unweighted_kmeans_ccr_selected_score), c(weighted_kmeans_ccr_cutoff_score, unweighted_kmeans_ccr_cutoff_score), c(weighted_kmeans_ccr_max_score,unweighted_kmeans_ccr_max_score), c(K_kmeans/2, K_kmeans/2), c(kmeans_Weighted_Design_result$overall_allocations[3], kmeans_Unweighted_Design_result$overall_allocations[3]))
+k_means_ccr_scores <- cbind(c(weighted_kmeans_ccr_min_score,unweighted_kmeans_ccr_min_score), c(weighted_kmeans_ccr_selected_score,unweighted_kmeans_ccr_selected_score), c(weighted_kmeans_ccr_cutoff_score, unweighted_kmeans_ccr_cutoff_score), c(weighted_kmeans_ccr_max_score,unweighted_kmeans_ccr_max_score), c(K_kmeans/2, K_kmeans/2), c(as.numeric(levels(kmeans_Weighted_Design_result$overall_allocations$`accepted allocations`)), as.numeric(levels(kmeans_Unweighted_Design_result$overall_allocations$`accepted allocations`))))
 rownames(k_means_ccr_scores) <- c("K-Means Weighted", "K-Means Unweighted")
 colnames(k_means_ccr_scores) <- c("Minimum Score", "Selected Balance Score", "10% Cutoff Score", "Maximum Score", "Number of Clusters in Each Treatment Arm", "Number of Allocations in Randomization Space")
 
 #CLARA
-clara_ccr_scores <- cbind(c(weighted_clara_ccr_min_score,unweighted_clara_ccr_min_score), c(weighted_clara_ccr_selected_score,unweighted_clara_ccr_selected_score), c(weighted_clara_ccr_cutoff_score, unweighted_clara_ccr_cutoff_score), c(weighted_clara_ccr_max_score,unweighted_clara_ccr_max_score), c(K_clara/2, K_clara/2), c(CLARA_Weighted_Design_result$overall_allocations[3], CLARA_Unweighted_Design_result$overall_allocations[3]))
+clara_ccr_scores <- cbind(c(weighted_clara_ccr_min_score,unweighted_clara_ccr_min_score), c(weighted_clara_ccr_selected_score,unweighted_clara_ccr_selected_score), c(weighted_clara_ccr_cutoff_score, unweighted_clara_ccr_cutoff_score), c(weighted_clara_ccr_max_score,unweighted_clara_ccr_max_score), c(K_clara/2, K_clara/2), c(as.numeric(levels(CLARA_Weighted_Design_result$overall_allocations$`accepted allocations`)), as.numeric(levels(CLARA_Unweighted_Design_result$overall_allocations$`accepted allocations`))))
 rownames(clara_ccr_scores) <- c("CLARA Weighted", "CLARA Unweighted")
 colnames(clara_ccr_scores) <- c("Minimum Score", "Selected Balance Score", "10% Cutoff Score", "Maximum Score", "Number of Clusters in Each Treatment Arm", "Number of Allocations in Randomization Space")
 
 #Hierarchical - geographic location only
-hclust_geo_ccr_scores <- cbind(c(weighted_hclust_geo_ccr_min_score,unweighted_hclust_geo_ccr_min_score), c(weighted_hclust_geo_ccr_selected_score,unweighted_hclust_geo_ccr_selected_score), c(weighted_hclust_geo_ccr_cutoff_score, unweighted_hclust_geo_ccr_cutoff_score), c(weighted_hclust_geo_ccr_max_score,unweighted_hclust_geo_ccr_max_score), c(K_hclust_geo/2, K_hclust_geo/2), c(hclust_geo_Weighted_Design_result$overall_allocations[3], hclust_geo_Unweighted_Design_result$overall_allocations[3]))
+hclust_geo_ccr_scores <- cbind(c(weighted_hclust_geo_ccr_min_score,unweighted_hclust_geo_ccr_min_score), c(weighted_hclust_geo_ccr_selected_score,unweighted_hclust_geo_ccr_selected_score), c(weighted_hclust_geo_ccr_cutoff_score, unweighted_hclust_geo_ccr_cutoff_score), c(weighted_hclust_geo_ccr_max_score,unweighted_hclust_geo_ccr_max_score), c(K_hclust_geo/2, K_hclust_geo/2), c(as.numeric(levels(hclust_geo_Weighted_Design_result$overall_allocations$`accepted allocations`)), as.numeric(levels(hclust_geo_Unweighted_Design_result$overall_allocations$`accepted allocations`))))
 rownames(hclust_geo_ccr_scores) <- c("H-Clust Weighted - Geo. Only", "H-Clust Unweighted - Geo. Only")
 colnames(hclust_geo_ccr_scores) <- c("Minimum Score", "Selected Balance Score", "10% Cutoff Score", "Maximum Score", "Number of Clusters in Each Treatment Arm", "Number of Allocations in Randomization Space")
 
 #Ward-like Hierarchical with mixed dissimilarity
-hclust_ccr_scores <- cbind(c(weighted_hclust_ccr_min_score,unweighted_hclust_ccr_min_score), c(weighted_hclust_ccr_selected_score,unweighted_hclust_ccr_selected_score), c(weighted_hclust_ccr_cutoff_score, unweighted_hclust_ccr_cutoff_score), c(weighted_hclust_ccr_max_score,unweighted_hclust_ccr_max_score), c(K_hclust/2, K_hclust/2), c(hclust_Weighted_Design_result$overall_allocations[3], hclust_Unweighted_Design_result$overall_allocations[3]))
+hclust_ccr_scores <- cbind(c(weighted_hclust_ccr_min_score,unweighted_hclust_ccr_min_score), c(weighted_hclust_ccr_selected_score,unweighted_hclust_ccr_selected_score), c(weighted_hclust_ccr_cutoff_score, unweighted_hclust_ccr_cutoff_score), c(weighted_hclust_ccr_max_score,unweighted_hclust_ccr_max_score), c(K_hclust/2, K_hclust/2), c(as.numeric(levels(hclust_Weighted_Design_result$overall_allocations$`accepted allocations`)), as.numeric(levels(hclust_Unweighted_Design_result$overall_allocations$`accepted allocations`))))
 rownames(hclust_ccr_scores) <- c("H-Clust Weighted", "H-Clust Unweighted")
 colnames(hclust_ccr_scores) <- c("Minimum Score", "Selected Balance Score", "10% Cutoff Score", "Maximum Score", "Number of Clusters in Each Treatment Arm", "Number of Allocations in Randomization Space")
 
