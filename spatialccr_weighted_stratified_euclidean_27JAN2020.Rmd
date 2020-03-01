@@ -1,13 +1,13 @@
 ---
-title: "Cluster Assignment and Stratified Covariate Constrained Randomization for Spatially-Correlated Data: Manhattan Distances"
+title: "Cluster Assignment and Stratified Covariate Constrained Randomization for Spatially-Correlated Data: Euclidean Distances"
 author: "Patrick Iben"
 date: "January 27, 2020"
 output: html_document
 ---
 
-This document provides a method on selecting clusters and treatment assignments for stratified cluster randomized trials, via covariate-constrained randomization and from spatially-correlated data. Three clustering techniques are used: K-Means; Clustering Large Applications (CLARA); Ward-Like Hierarchical Clustering. The distance metric is Manhattan distance. Optimal treatment assignments are determined by: balance on strata, evidence of spatial heterogeneity of treatment assignments, and randomly-selected CCR score.
+This document provides a method on selecting clusters and treatment assignments for stratified cluster randomized trials, via covariate-constrained randomization and from spatially-correlated data. Three clustering techniques are used: K-Means; Clustering Large Applications (CLARA); Ward Hierarchical Clustering. The distance metric is Manhattan distance. Optimal treatment assignments are determined by: balance on strata, evidence of spatial heterogeneity of treatment assignments, and randomly-selected CCR score.
 
-For this data scenario, the three covariates on which we are constraining CRT design are cluster-level: baseline malaria prevalence (via microscopy), household density, and proportion bordering a still body of water. 
+For this data scenario, the three covariates on which we are constraining CRT design are cluster-level: baseline malaria prevalence (via microscopy), household density, and proportion bordering a still body of water.
 
 ```{r, echo=F, message=F, warning=F, include = F}
 op <- par()
@@ -129,7 +129,7 @@ poly1_noMagoro <- poly1[c(1:55),]
 #row.names(poly1_noMagoro)
 row.names(poly1_noMagoro@data) <-poly1_noMagoro@data$village_sc
 row.names(poly1_noMagoro) <- row.names(poly1_noMagoro@data)
-
+#row.names(study_data_wide)
 rownames(study_data_wide) <- study_data_wide$village_code
 
 #Building spatial polygons dataframe from shape file and feature data
@@ -144,12 +144,6 @@ waterPal <- brewer.pal(n = 9, name = "YlGnBu")#water color scheme
 
 #Extracting spatial location coordinates
 geo_data <- coordinates(poly1_noMagoro)
-
-#Manhattan distance matrix
-dist_matrix <- as.matrix(daisy(geo_data, metric = "manhattan"))
-
-#Saving nearest treatment arm neighbor (Manhattan distance)
-nn_manhattan <- apply(dist_matrix, 1, FUN = function(x) {min(x[x > 0])})
 ```
 
 As CRTs tend to have only two treatment arms for which to randomize clusters (treatment and control), only even number of clusters can be considered to evenly assign units. For this example, the one stratification variable - subcounty - has two levels. Thus, to best assure even allocation of the two trial arms into the two strata levels (though not a guarantee), only cluster sizes divisible by four should be considered. If only four clusters are created, then there are a total of six (4 choose 2) configurations to select randomly from for CCR. 
@@ -157,7 +151,7 @@ As CRTs tend to have only two treatment arms for which to randomize clusters (tr
 If the default cutoff for cvrall() of 10% is used, then this leaves only one treatment allocation scheme to select from, thus creating a deterministic selection for cluster assignment - and no longer qualifies as a randomized control trial. To remove this possibility, only multiples of four, that are greater than or equal to eight, are considered. 
 
 ```{r, echo=T, message=F, warning=F}
-#Setting minimum K for cluster size
+#Setting minimum K for cluster size -
 minclust <- 8 
 #Setting maximum K for cluster size to ensure at least 3 units per cluster for buffer
 n_3 <- round((nrow(study_data_wide))/3)
@@ -167,7 +161,7 @@ n_3_divby4 <- ifelse(n_3_even %% 4 != 0, n_3_even-2, n_3_even)#If not divisible 
 #If ((closest even number under number of units divided by 3) *3)) is greater than number of units, then subtract 4 from previous line for the maximum cluster size
 maxclust <- ifelse((n_3_divby4*3) > nrow(study_data_wide), n_3_divby4-4, n_3_divby4)
 
-paste("For this example, a maximum of ", maxclust, " clusters will be tested.", sep = "")
+paste("For this example, a maximum of ", maxclust, " clusters will be tested", sep="")
 ```
 
 ####CCR Weights
@@ -203,20 +197,20 @@ Strata <- "county"
 CCR_SumStats_Strata <- c(Cluster_SumStats, Strata)
 ```
 
-####Optimization via CCR score
+####CCR Optimization
 
 ```{r, echo=T, message=F, warning=F}
-##K-Means
 kmeans_best_ccr<-NA
 seed <- 1
 while (is.na(kmeans_best_ccr)){
+
 #Initializing listing of cluster assignments for each value of K
 clustering_list <- list()
 
 #Collecting cluster quality statistics across range of cluster sizes
 for(i in seq(minclust,maxclust, by = 4)){
   set.seed(seed)
-  clustering_list[[i-(minclust-1)]] <- Kmeans(geo_data, i, method = "manhattan")$cluster
+  clustering_list[[i-(minclust-1)]] <- kmeans(geo_data, i)$cluster
 }
 
 #Stripping null list elements
@@ -244,6 +238,15 @@ study_data_wide$Row.names <- NULL
 
 #K-Means CCR
 
+#Adding in village code to merge with lat/long. (for spatial clustering test)
+village_code <- rownames(kmeans_cluster_assignments)
+kmeans_cluster_assignments_df <- data.frame(cbind(kmeans_cluster_assignments, village_code))
+
+#Saving spatial location as df for merging
+geo_data_df <- data.frame(geo_data)
+colnames(geo_data_df) <- c("village_long", "village_lat")
+geo_data_df$village_code <- rownames(geo_data_df)
+
 #Initializing listing of cluster assignments for each value of K
 kmeans_sumstats <- list()
 kmeans_ccr <-list()
@@ -253,15 +256,6 @@ split_trt_loc <- list()
 spat_clust <- matrix(data = NA, nrow = ncol(kmeans_cluster_assignments), ncol = 1, byrow = FALSE,dimnames = NULL)
 ccr_selected <- matrix(data = NA, nrow = ncol(kmeans_cluster_assignments), ncol = 1, byrow = FALSE,dimnames = NULL)
 balanced_strata <- matrix(data = NA, nrow = ncol(kmeans_cluster_assignments), ncol = 1, byrow = FALSE,dimnames = NULL)
-
-#Adding in village code to merge with lat/long. (for spatial clustering test)
-village_code <- rownames(kmeans_cluster_assignments)
-kmeans_cluster_assignments_df <- data.frame(cbind(kmeans_cluster_assignments, village_code))
-
-#Saving spatial location as df for merging
-geo_data_df <- data.frame(geo_data)
-colnames(geo_data_df) <- c("village_long", "village_lat")
-geo_data_df$village_code <- rownames(geo_data_df)
 
 #Saving cluster summary statistics for balancing
 for(i in 1:ncol(kmeans_cluster_assignments)){  
@@ -304,14 +298,11 @@ kmeans_cluster_assignments_df <- left_join(geo_data_df, kmeans_cluster_assignmen
 #Saving separate dataframes of treatment assignments with their spatial location data (coordinates)
 trt_loc[[i]] <- data.frame(cbind(select(kmeans_cluster_assignments_df, ends_with("_trt"))[i]), geo_data_df)
 
-#Merging nearest neighbor distance
-trt_loc[[i]] <- cbind(trt_loc[[i]], nn_manhattan)
-
 #Split by treatment group
 split_trt_loc[[i]] <- split(trt_loc[[i]], trt_loc[[i]][1])
 
 #Testing for significant differences in mean nn-dist with Welch Two Sample t-test
-spat_clust[i,] <- ifelse(t.test(split_trt_loc[[i]]$`0`$nn_manhattan,split_trt_loc[[i]]$`1`$nn_manhattan)$p.value < 0.05, 1, 0) 
+spat_clust[i,] <- ifelse(t.test(nndist(split_trt_loc[[i]]$`0`$village_lat, split_trt_loc[[i]]$`0`$village_long), nndist(split_trt_loc[[i]]$`1`$village_lat, split_trt_loc[[i]]$`1`$village_long))$p.value < 0.05, 1, 0)
 
 #Testing for balance on strata
 balanced_strata[i,] <- ifelse(regmatches(levels(kmeans_ccr[[i]]$baseline_table$`arm = 0`[5])[1], gregexpr("(?<=\\().*?(?=\\))", levels(kmeans_ccr[[i]]$baseline_table$`arm = 0`[5])[1], perl=T))[[1]] == "50.0" && regmatches(levels(kmeans_ccr[[i]]$baseline_table$`arm = 1`[5])[1], gregexpr("(?<=\\().*?(?=\\))", levels(kmeans_ccr[[i]]$baseline_table$`arm = 1`[5])[1], perl=T))[[1]] == "50.0"
@@ -331,11 +322,10 @@ ccr_bal_clust <- ccr_all[which(ccr_all$spat_clust == 1 & ccr_all$balanced_strata
 #IDing lowest selected score
 lowest_index <- as.numeric(rownames(ccr_bal_clust[which.min(ccr_bal_clust[,1]),]))
 kmeans_best_ccr <- ifelse(length(lowest_index) == 0, NA, kmeans_ccr[lowest_index])
-
 seed = seed + 1
 }
 
-paste("Seed: ", seed, sep = "")
+paste("Seed: ",seed,sep = "")
 
 seed_kmeans <- seed
 seed_mat <- data.matrix(seed_kmeans)
@@ -394,17 +384,17 @@ kmeans_best_df <- left_join(kmeans_df, village_coords, by ="village_code")
 #Merging with seed that was ultimately used for configuration
 kmeans_best_df <- data.frame(kmeans_best_df, seed_mat)
 
-#CLARA
+####CLARA
+
 clara_best_ccr<-NA
 seed <- 1
 while (is.na(clara_best_ccr)){
-  
 #Initializing listing of cluster assignments for each value of K
 clustering_list <- list()
 
 #Collecting cluster quality statistics across range of cluster sizes
 for(i in seq(minclust,maxclust, by = 4)){
-  clustering_list[[i-(minclust-1)]] <- clara(geo_data, metric = "manhattan", k = i)$cluster
+  clustering_list[[i-(minclust-1)]] <- clara(geo_data, metric = "euclidean", k = i)$cluster
 }
 
 #Stripping null list elements
@@ -432,6 +422,15 @@ study_data_wide$Row.names <- NULL
 
 #CLARA CCR
 
+#Adding in village code to merge with lat/long. (for spatial clustering test)
+village_code <- rownames(clara_cluster_assignments)
+clara_cluster_assignments_df <- data.frame(cbind(clara_cluster_assignments, village_code))
+
+#Saving spatial location as df for merging
+geo_data_df <- data.frame(geo_data)
+colnames(geo_data_df) <- c("village_long", "village_lat")
+geo_data_df$village_code <- rownames(geo_data_df)
+
 #Initializing listing of cluster assignments for each value of K
 clara_sumstats <- list()
 clara_ccr <-list()
@@ -441,15 +440,6 @@ split_trt_loc <- list()
 spat_clust <- matrix(data = NA, nrow = ncol(clara_cluster_assignments), ncol = 1, byrow = FALSE,dimnames = NULL)
 ccr_selected <- matrix(data = NA, nrow = ncol(clara_cluster_assignments), ncol = 1, byrow = FALSE,dimnames = NULL)
 balanced_strata <- matrix(data = NA, nrow = ncol(clara_cluster_assignments), ncol = 1, byrow = FALSE,dimnames = NULL)
-
-#Adding in village code to merge with lat/long. (for spatial clustering test)
-village_code <- rownames(clara_cluster_assignments)
-clara_cluster_assignments_df <- data.frame(cbind(clara_cluster_assignments, village_code))
-
-#Saving spatial location as df for merging
-geo_data_df <- data.frame(geo_data)
-colnames(geo_data_df) <- c("village_long", "village_lat")
-geo_data_df$village_code <- rownames(geo_data_df)
 
 #Saving cluster summary statistics for balancing
 for(i in 1:ncol(clara_cluster_assignments)){  
@@ -492,14 +482,11 @@ clara_cluster_assignments_df <- left_join(geo_data_df, clara_cluster_assignments
 #Saving separate dataframes of treatment assignments with their spatial location data (coordinates)
 trt_loc[[i]] <- data.frame(cbind(select(clara_cluster_assignments_df, ends_with("_trt"))[i]), geo_data_df)
 
-#Merging with nearest neighbor (Manhattan)
-trt_loc[[i]] <- cbind(trt_loc[[i]], nn_manhattan)
-
 #Split by treatment group
 split_trt_loc[[i]] <- split(trt_loc[[i]], trt_loc[[i]][1])
 
 #Testing for significant differences in mean nn-dist with Welch Two Sample t-test
-spat_clust[i,] <- ifelse(t.test(split_trt_loc[[i]]$`0`$nn_manhattan,split_trt_loc[[i]]$`1`$nn_manhattan)$p.value < 0.05, 1, 0)   
+spat_clust[i,] <- ifelse(t.test(nndist(split_trt_loc[[i]]$`0`$village_lat, split_trt_loc[[i]]$`0`$village_long), nndist(split_trt_loc[[i]]$`1`$village_lat, split_trt_loc[[i]]$`1`$village_long))$p.value < 0.05, 1, 0)
 
 #Testing for balance on strata
 balanced_strata[i,] <- ifelse(regmatches(levels(clara_ccr[[i]]$baseline_table$`arm = 0`[5])[1], gregexpr("(?<=\\().*?(?=\\))", levels(clara_ccr[[i]]$baseline_table$`arm = 0`[5])[1], perl=T))[[1]] == "50.0" && regmatches(levels(clara_ccr[[i]]$baseline_table$`arm = 1`[5])[1], gregexpr("(?<=\\().*?(?=\\))", levels(clara_ccr[[i]]$baseline_table$`arm = 1`[5])[1], perl=T))[[1]] == "50.0"
@@ -520,10 +507,10 @@ ccr_bal_clust <- ccr_all[which(ccr_all$spat_clust == 1 & ccr_all$balanced_strata
 lowest_index <- as.numeric(rownames(ccr_bal_clust[which.min(ccr_bal_clust[,1]),]))
 clara_best_ccr <- ifelse(length(lowest_index) == 0, NA, clara_ccr[lowest_index])
 
-seed = seed +1
+seed = seed + 1 
 }
 
-paste("Seed: ", seed, sep = "")
+paste("Seed: ",seed,sep = "")
 
 #Saving seed
 seed_clara <- seed
@@ -580,8 +567,10 @@ village_coords <- data.frame(cbind(geo_data, village_code))
 
 #Merging centroids with optimized treatment assignments
 clara_best_df <- left_join(clara_df, village_coords, by ="village_code")
+#Merging df with ultimate seed
+clara_best_df <- data.frame(clara_best_df, seed_clara)
 
-##Ward-Like Hierarchical Clustering
+##Ward Hierarchical Clustering
 
 hclust_best_ccr<-NA
 seed <- 1
@@ -591,8 +580,11 @@ clustering_list <- list()
 hclust_cluster_assignments <- matrix(data = NA, nrow = nrow(geo_data), ncol = maxclust-minclust+1, byrow = FALSE,dimnames = NULL)
 colnames(hclust_cluster_assignments) <- minclust:maxclust
 
-#Performing non-Euclidean Ward-Like hierarchical clustering with hclustgeo()
-tree <- hclustgeo(as.dist(dist_matrix))
+#Geographical distance
+dist <- as.dist(as.matrix(daisy(geo_data, metric = "euclidean")))
+
+#Performing hierarchical clustering with Ward.D metric
+tree <- hclust(dist, "ward.D")
 
 #Collecting cluster quality statistic across range of cluster sizes
 for(i in seq(minclust,maxclust, by = 4)){
@@ -611,7 +603,6 @@ hclust_cluster_assignments <- matrix(data = NA, nrow = nrow(geo_data), ncol = le
 
 for(i in 1:length(clustering_list)){
   hclust_cluster_assignments[,i] <- clustering_list[[i]]
-  colnames(hclust_cluster_assignments) <- cat("hclust_",max(hclust_cluster_assignments[,i]), sep = "")
 }
 
 colnames(hclust_cluster_assignments) <- paste("hclust_", seq(minclust,maxclust, by= 4), sep = "")
@@ -621,6 +612,15 @@ rownames(hclust_cluster_assignments) <- names(clustering_list[[1]])
 study_data_wide <- merge(hclust_cluster_assignments, study_data_wide,by = "row.names")
 
 study_data_wide$Row.names <- NULL
+
+#Adding in village code to merge with lat/long. (for spatial clustering test)
+village_code <- rownames(hclust_cluster_assignments)
+hclust_cluster_assignments_df <- data.frame(cbind(hclust_cluster_assignments, village_code))
+
+#Saving spatial location as df for merging
+geo_data_df <- data.frame(geo_data)
+colnames(geo_data_df) <- c("village_long", "village_lat")
+geo_data_df$village_code <- rownames(geo_data_df)
 
 #H-Clust CCR
 
@@ -633,15 +633,6 @@ split_trt_loc <- list()
 spat_clust <- matrix(data = NA, nrow = ncol(hclust_cluster_assignments), ncol = 1, byrow = FALSE,dimnames = NULL)
 ccr_selected <- matrix(data = NA, nrow = ncol(hclust_cluster_assignments), ncol = 1, byrow = FALSE,dimnames = NULL)
 balanced_strata <- matrix(data = NA, nrow = ncol(hclust_cluster_assignments), ncol = 1, byrow = FALSE,dimnames = NULL)
-
-#Adding in village code to merge with lat/long. (for spatial clustering test)
-village_code <- rownames(hclust_cluster_assignments)
-hclust_cluster_assignments_df <- data.frame(cbind(hclust_cluster_assignments, village_code))
-
-#Saving spatial location as df for merging
-geo_data_df <- data.frame(geo_data)
-colnames(geo_data_df) <- c("village_long", "village_lat")
-geo_data_df$village_code <- rownames(geo_data_df)
 
 #Saving cluster summary statistics for balancing
 for(i in 1:ncol(hclust_cluster_assignments)){  
@@ -684,16 +675,13 @@ hclust_cluster_assignments_df <- left_join(geo_data_df, hclust_cluster_assignmen
 #Saving separate dataframes of treatment assignments with their spatial location data (coordinates)
 trt_loc[[i]] <- data.frame(cbind(select(hclust_cluster_assignments_df, ends_with("_trt"))[i]), geo_data_df)
 
-#Merging nearest neighbor (Manhattan)
-trt_loc[[i]] <- cbind(trt_loc[[i]], nn_manhattan)
-
 #Split by treatment group
 split_trt_loc[[i]] <- split(trt_loc[[i]], trt_loc[[i]][1])
 
 #Testing for significant differences in mean nn-dist with Welch Two Sample t-test
-spat_clust[i,] <- ifelse(t.test(split_trt_loc[[i]]$`0`$nn_manhattan,split_trt_loc[[i]]$`1`$nn_manhattan)$p.value < 0.05, 1, 0)   
+spat_clust[i,] <- ifelse(t.test(nndist(split_trt_loc[[i]]$`0`$village_lat, split_trt_loc[[i]]$`0`$village_long), nndist(split_trt_loc[[i]]$`1`$village_lat, split_trt_loc[[i]]$`1`$village_long))$p.value < 0.05, 1, 0)
 
-#Testing for balance on strata (regex used to find string)
+#Testing for balance on strata
 balanced_strata[i,] <- ifelse(regmatches(levels(hclust_ccr[[i]]$baseline_table$`arm = 0`[5])[1], gregexpr("(?<=\\().*?(?=\\))", levels(hclust_ccr[[i]]$baseline_table$`arm = 0`[5])[1], perl=T))[[1]] == "50.0" && regmatches(levels(hclust_ccr[[i]]$baseline_table$`arm = 1`[5])[1], gregexpr("(?<=\\().*?(?=\\))", levels(hclust_ccr[[i]]$baseline_table$`arm = 1`[5])[1], perl=T))[[1]] == "50.0"
 ,1,0)
 
@@ -711,11 +699,10 @@ ccr_bal_clust <- ccr_all[which(ccr_all$spat_clust == 1 & ccr_all$balanced_strata
 #IDing lowest selected score
 lowest_index <- as.numeric(rownames(ccr_bal_clust[which.min(ccr_bal_clust[,1]),]))
 hclust_best_ccr <- ifelse(length(lowest_index) == 0, NA, hclust_ccr[lowest_index])
-
-seed = seed +1
+seed = seed + 1 
 }
 
-paste("Seed: ", seed, sep = "")
+paste("Seed: ",seed,sep = "")
 
 #Saving seed
 seed_hclust <- seed
@@ -734,6 +721,7 @@ colnames(hclust_optimized_treatments) <- c("hclust_cluster", "village_code")
 hclust_optimized_treatments <- merge(hclust_optimized_treatments, hclust_ccr_mat, by = "hclust_cluster")
 
 K_hclust <- max(as.numeric(hclust_optimized_treatments$hclust_cluster))
+
 
 #Adding treatment allocations to clusters for proper labeling with spplot()
 #Cluster assignments
@@ -794,7 +782,7 @@ best_treatments <- kmeans_treatments
 overall_best_design[[1]]$baseline_table  
 
 #Visualizing clusters
-sp::plot(map,border="grey",col=best_clustering[,1], main= paste(K_best,"-Cluster Partition Obtained with ", best, " Clustering \n on Centroid Manhattan Distance", sep = ""),cex.main=1)
+sp::plot(map,border="grey",col=best_clustering[,1], main= paste(K_best,"-Cluster Partition Obtained with ", best, " Clustering \n on Centroid Euclidean Distance", sep = ""),cex.main=1)
 legend("bottomleft", legend=paste("Cluster",1:K_best), fill=1:K_best, bty="n",border="white")
 text(coordinates(map), labels = best_clustering[,1])
 
@@ -803,8 +791,8 @@ sp::plot(map,border="grey",col= best_treatments[,2], main= paste("Treatment Allo
 legend("bottomleft", legend=paste("Treatment",1:2), fill=0:1, bty="n",border="grey")
 
 #Saving design
-write.csv(overall_best_design[[1]]$baseline_table, "overall_best_ccr_table_manhattan.csv")
-write.csv(overall_best_design_df, "overall_best_ccr_assignments_manhattan.csv")
+write.csv(overall_best_design[[1]]$baseline_table, "overall_best_ccr_table_Euclidean.csv")
+write.csv(overall_best_design_df, "overall_best_ccr_assignments_Euclidean.csv")
 } else if (min(best_scores)==best_scores[2]) {
 overall_best_design <- clara_best_ccr
 overall_best_design_df <- clara_best_df
@@ -813,10 +801,12 @@ K_best <- K_clara
 best_clustering <- clara_clustering
 best_treatments <- clara_treatments
   paste("The configuration with the lowest selected CCR score, exhibiting spatial heterogeneity of treatment assignments and balance on strata, is ", best, " with ", K_best, " clusters.",sep = "")
-
+  
+#Summary stats for best selected design
+overall_best_design$baseline_table  
 
 #Visualizing clusters
-sp::plot(map,border="grey",col=best_clustering[,1], main= paste(K_best,"-Cluster Partition Obtained with ", best, " Clustering \n on Centroid Manhattan Distance", sep = ""),cex.main=1)
+sp::plot(map,border="grey",col=best_clustering[,1], main= paste(K_best,"-Cluster Partition Obtained with ", best, " Clustering \n on Centroid Euclidean Distance", sep = ""),cex.main=1)
 legend("bottomleft", legend=paste("Cluster",1:K_best), fill=1:K_best, bty="n",border="white")
 text(coordinates(map), labels = best_clustering[,1])
 
@@ -825,8 +815,8 @@ sp::plot(map,border="grey",col= best_treatments[,2], main= paste("Treatment Allo
 legend("bottomleft", legend=paste("Treatment",1:2), fill=0:1, bty="n",border="grey")
 
 #Saving design
-write.csv(overall_best_design[[1]]$baseline_table, "overall_best_ccr_table_manhattan.csv")
-write.csv(overall_best_design_df, "overall_best_ccr_assignments_manhattan.csv")
+write.csv(overall_best_design[[1]]$baseline_table, "overall_best_ccr_table_Euclidean.csv")
+write.csv(overall_best_design_df, "overall_best_ccr_assignments_Euclidean.csv")
 } else {
 overall_best_design <- hclust_best_ccr
 overall_best_design_df <- hclust_best_df
@@ -837,7 +827,7 @@ best_treatments <- hclust_treatments
   paste("The configuration with the lowest selected CCR score, exhibiting spatial heterogeneity of treatment assignments and balance on strata, is ", best, " with ", K_best, " clusters.",sep = "")
 
 #Visualizing clusters
-sp::plot(map,border="grey",col=best_clustering[,1], main= paste(K_best,"-Cluster Partition Obtained with ", best, " Clustering \n on Centroid Manhattan Distance", sep = ""),cex.main=1)
+sp::plot(map,border="grey",col=best_clustering[,1], main= paste(K_best,"-Cluster Partition Obtained with ", best, " Clustering \n on Centroid Euclidean Distance", sep = ""),cex.main=1)
 legend("bottomleft", legend=paste("Cluster",1:K_best), fill=1:K_best, bty="n",border="white")
 text(coordinates(map), labels = best_clustering[,1])
 
@@ -846,8 +836,8 @@ sp::plot(map,border="grey",col= best_treatments[,2], main= paste("Treatment Allo
 legend("bottomleft", legend=paste("Treatment",1:2), fill=0:1, bty="n",border="grey")
 
 #Saving design
-write.csv(overall_best_design[[1]]$baseline_table, "overall_best_ccr_table_manhattan.csv")
-write.csv(overall_best_design_df, "overall_best_ccr_assignments_manhattan.csv")
+write.csv(overall_best_design[[1]]$baseline_table, "overall_best_ccr_table_Euclidean.csv")
+write.csv(overall_best_design_df, "overall_best_ccr_assignments_Euclidean.csv")
 }
 
 #Treatment assignments and summary stats
@@ -855,6 +845,5 @@ overall_best_design_df
 overall_best_design[[1]]$baseline_table
 overall_best_design[[1]]$bscores
 ```
-
 
 
