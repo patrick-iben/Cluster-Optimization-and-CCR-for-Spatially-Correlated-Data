@@ -1,17 +1,17 @@
 ---
 title: "Cluster Assignment and Stratified Covariate Constrained Randomization for Spatially-Correlated Data: Euclidean Distances"
 author: "Patrick Iben"
-date: "May 30, 2020"
+date: "July 19, 2020"
 output:
   html_document: default
   word_document: default
   pdf_document: default
 ---
 
-This document provides a method on selecting clusters and treatment assignments for stratified cluster randomized trials, via covariate-constrained randomization and from spatially-correlated data. Three clustering techniques are used: K-Means; Clustering Large Applications (CLARA); Ward Hierarchical Clustering. The distance metric is Manhattan distance. Optimal treatment assignments are determined by: balance on strata, evidence of spatial heterogeneity of treatment assignments, and randomly-selected CCR score. Optimal design selection is based on which of the three selected CCR schemes is the lowest, while also being balanced on the strata and exhibiting spatial heterogeneity, thus helping minimize spatial contamination. All clustering and CCR algorithms for each of the three methods are placed in while loops, with seeds starting at 1. If a selected randomization scheme for a given method is not balanced on strata and exhibiting spatial heterogeneity of treatment arms, the loop starts over with 1 added to the seed and repeat until such a scheme was chosen. 
+In malaria research, interventions are often applied to communities, not individuals, such as spraying of insecticides, distribution of medications to health centers, or bed net campaigns. CCR is a potentially beneficial method for assigning treatments to communities. However, spatial heterogeneity needs to be considered, as mosquitoes and people move frequently, and the potential for treatment contamination is high. Thus, it is desirable to optimize community assignment to clusters that are contiguous, yet still achieve random assignment of clusters to intervention arms. 
+This document provides a method on selecting clusters and treatment assignments for stratified cluster randomized trials, via covariate-constrained randomization and from spatially-correlated data. Three clustering techniques are used: K-Means; Clustering Large Applications (CLARA); Ward Hierarchical Clustering. The distance metric is Euclidean distance. Optimal treatment assignments are determined by: balance on strata, evidence of spatial heterogeneity of treatment assignments, and randomly-selected CCR score. Optimal design selection is based on which of the three selected CCR schemes is the lowest, while also being balanced on the strata and exhibiting spatial heterogeneity, thus helping minimize spatial contamination. All clustering and CCR algorithms for each of the three methods are placed in while loops, with seeds starting at 1. If a selected randomization scheme for a given method is not balanced on strata and exhibiting spatial heterogeneity of treatment arms, the loop starts over with 1 added to the seed and repeat until such a scheme was chosen. 
 
 For this data scenario, the three covariates on which we are constraining CRT design are cluster-level: baseline malaria prevalence (via microscopy), household density, and proportion bordering a still body of water.
-
 
 ```{r, echo=F, message=F, warning=F, include = F}
 op <- par()
@@ -20,37 +20,19 @@ emptyenv()
 rm(list=ls())
 
 ### MAPPING PACKAGES ###
-#packages <- c("RColorBrewer", "sp", "maptools", "lattice", "latticeExtra", "rgdal", "classInt", "gridExtra","ggplot2","tidyr","zeallot", "cluster", "ClustGeo", "WeightedCluster", "cvcrand", "spdep", "spatstat", "gmodels","tidyverse", "amap")
+packages <- c("RColorBrewer", "sp", "maptools", "lattice", "latticeExtra", "rgdal", "classInt", "gridExtra","ggplot2","tidyr","zeallot", "cluster", "ClustGeo", "WeightedCluster", "cvcrand", "spdep", "spatstat", "gmodels","tidyverse", "amap")
 #install.packages(packages)
-#lapply(packages, suppressMessages(library), character.only = TRUE)
+lapply(packages, suppressMessages(library), character.only = TRUE)
 #load required base tools() package
-library(RColorBrewer)
-library(sp)
-library(maptools)
-library(lattice)
-library(latticeExtra)
-library(rgdal)
-library(classInt)
-library(gridExtra)
-library(ggplot2)
-library(tidyr)
-library(zeallot)
-library(cluster)
-library(ClustGeo)
-library(WeightedCluster)
-library(cvcrand)
-library(spdep)
-library(spatstat)
-library(gmodels)
-library(tidyverse)
-library(amap)
 library(tools)
 
 #Setting working directory for village-level spatial feature data
 choose.dir()
 ```
 
-```{r, echo=F, message=F, warning=F, include = F}
+Reading in and cleaning spatial feature and geo-location data, to merge into spatial polygons data frame. After the study data has been merged with the geo-location data, subsets are made of each sub-county(stratum). This will allow us to maintain the separation of sub-counties during cluster optimization.
+
+```{r, echo=T, message=F, warning=F, include = F}
 #Reading in village data
 vill <- read.csv('study_by_village.csv')
 vill2 <- vill[c(1:10, 21, 22)]
@@ -232,7 +214,11 @@ Strata <- "county"
 CCR_SumStats_Strata <- c(Cluster_SumStats, Strata)
 ```
 
-####CCR Optimization
+CCR Optimization
+
+Below, all three cluster optimization methods are optimized for stratified, weighted CCR.
+
+K-Means:
 
 ```{r, echo=T, message=F, warning=F}
 kmeans_best_ccr<-NA
@@ -419,9 +405,11 @@ village_coords <- data.frame(cbind(geo_data, village_code))
 kmeans_best_df <- left_join(kmeans_df, village_coords, by ="village_code")
 #Merging with seed that was ultimately used for configuration
 kmeans_best_df <- data.frame(kmeans_best_df, seed_mat)
+```
 
-####CLARA
+CLARA:
 
+```{r, echo=T, message=F, warning=F}
 seed <- 1
 clara_best_ccr<-NA
 while (is.na(clara_best_ccr)){
@@ -607,9 +595,11 @@ village_coords <- data.frame(cbind(geo_data, village_code))
 clara_best_df <- left_join(clara_df, village_coords, by ="village_code")
 #Merging df with ultimate seed
 clara_best_df <- data.frame(clara_best_df, seed_clara)
+```
 
-##Ward Hierarchical Clustering
+Ward Hierarchical Clustering:
 
+```{r, echo=T, message=F, warning=F}
 hclust_best_ccr<-NA
 seed <- 1
 while (is.na(hclust_best_ccr)){
@@ -806,7 +796,7 @@ hclust_best_df <- left_join(hclust_df, village_coords, by ="village_code")
 hclust_best_df <- data.frame(hclust_best_df, seed_hclust)
 ```
 
-Overall:
+Selecting the best overall clustering optimization method and study design:
 
 ```{r, echo=T, message=F, warning=F}
 best_scores <-  c(as.numeric(kmeans_best_ccr[[1]]$bscores[1,2]),as.numeric(clara_best_ccr[[1]]$bscores[1,2]),as.numeric(hclust_best_ccr[[1]]$bscores[1,2]))
