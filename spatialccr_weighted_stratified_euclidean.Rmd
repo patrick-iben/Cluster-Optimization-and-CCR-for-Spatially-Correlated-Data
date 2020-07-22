@@ -13,7 +13,7 @@ This document provides a method on selecting clusters and treatment assignments 
 
 For this data scenario, the three covariates on which we are constraining CRT design are cluster-level: baseline malaria prevalence (via microscopy), household density, and proportion bordering a still body of water.
 
-```{r, echo=F, message=F, warning=F, include = F}
+```{r, echo=T, message=F, warning=F, include = F}
 op <- par()
 options(width=80)
 emptyenv()
@@ -30,7 +30,7 @@ library(tools)
 choose.dir()
 ```
 
-Reading in and cleaning spatial feature and geo-location data, to merge into spatial polygons data frame. After the study data has been merged with the geo-location data, subsets are made of each sub-county(stratum). This will allow us to maintain the separation of sub-counties during cluster optimization.
+After loading necessary packages and setting the directory, spatial feature and geo-location data are read in and cleaned, to merge into spatial polygons data frame. After the study data has been merged with the geo-location data, subsets are made of each sub-county(stratum). This will allow us to maintain the separation of sub-counties during cluster optimization.
 
 ```{r, echo=T, message=F, warning=F, include = F}
 #Reading in village data
@@ -894,5 +894,45 @@ legend("bottomleft", legend=paste("Treatment",1:2), fill=0:1, bty="n",border="gr
 
 ```
 
+References
 
+[1] Moulton LH. Covariate-based constrained randomization of group-randomized trials. Clinical Trials 2004;1(3):297–305.
 
+[2] Dickinson LM, Beaty B, Fox C, Pace W, Dickinson WP, Emsermann C, et al. Pragmatic Cluster Randomized Trials Using Covariate Constrained Randomization: A Method for Practice-based Research Networks (PBRNs). The Journal of the American Board of Family Medicine 2015;28(5):663–672. 
+
+[3] Keogh-Brown M, Bachmann M, Shepstone L, Hewitt C, Howe A, Ramsay C, et al. Contamination in trials of educational interventions. Health technology assessment (Winchester, England) 2007 11;11:iii, ix–107.
+
+[4] Manning CD, Raghavan P, Schütze H. Introduction to Information Retrieval. Cambridge University Press; 2018.
+
+[5] Kaufman L, Rousseeuw P. Finding Groups in Data: An Introduction To Cluster Analysis; 1990.
+
+[6] Bishop CM. Neural Networks for Pattern Recognition. New York, NY, USA: Oxford University Press, Inc.; 1995.
+
+[7] Distance;. http://mathworld.wolfram.com/Distance.html.
+
+[8] Jin X, Han J. In: Sammut C, Webb GI, editors. K-Medoids Clustering Boston, MA: Springer US; 2010. p. 564–565.
+
+[9] R Core Team. R: A Language and Environment for Statistical Computing. R Foundation for Statistical Computing, Vienna, Austria; 2018, https://www.R-project.org/.
+
+[10] Raab GM, Butcher I. Balance in cluster randomized trials. Statistics in Medicine 2001;20(3):351–365.
+
+[11] Yu H, Li F, Gallis JA, Turner EL. cvcrand: Efficient Design and Analysis of Cluster Randomized Trials; 2019, https://CRAN.R-project.org/package=cvcrand, r package version 0.0.3.
+
+[12] Elizabeth A Albright P, Two Independent Samples Unequal Variance (Welch’s Test). Duke; 2018. https://sites.nicholas.duke.edu/statsreview/means/welch/.
+
+[13] Ram A, Jalal S, Jalal AS, Kumar M. A Density Based Algorithm for Discovering Density Varied Clusters in Large Spatial
+Databases. International Journal of Computer Applications 2010;3(6):1–4.
+
+[14] Kamil I, Almamory S. Data Partitioning Technique to Enhance DBSCAN Clustering Algorithm 2018 03;Vol.(25).
+
+[15] Hahsler M, Piekenbrock M, Doran D. dbscan: Fast Density-Based Clustering with R. Journal of Statistical Software 2019;91(1):1–30.
+
+[16] Pebesma EJ, Bivand RS. Classes and methods for spatial data in R. R News 2005 November;5(2):9–13. https://CRAN.Rproject.org/doc/Rnews/.
+
+[17] Bivand RS, Pebesma E, Gomez-Rubio V. Applied spatial data analysis with R, Second edition. Springer, NY; 2013. http://www.asdar-book.org/.
+
+[18] Maechler M, Rousseeuw P, Struyf A, Hubert M, Hornik K. cluster: Cluster Analysis Basics and Extensions; 2018, r package version 2.0.7-1.
+
+[19] Hartigan JA, Wong MA. Algorithm AS 136: A K-Means Clustering Algorithm. Journal of the Royal Statistical Society Series C (Applied Statistics) 1979;28(1):100–108. 
+
+[20] Baddeley A, Turner R. spatstat: An R Package for Analyzing Spatial Point Patterns. Journal of Statistical Software 2005;12(6):1–42.
