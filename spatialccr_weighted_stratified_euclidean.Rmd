@@ -1,7 +1,7 @@
 ---
 title: "Cluster Assignment and Stratified Covariate Constrained Randomization for Spatially-Correlated Data: Euclidean Distances"
 author: "Patrick Iben"
-date: "July 19, 2020"
+date: "July 29, 2020"
 output:
   html_document: default
   word_document: default
