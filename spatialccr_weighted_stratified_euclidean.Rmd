@@ -126,7 +126,7 @@ study_data_wide <- reshape(study_data, idvar = "village_code", sep = "_", timeva
 #Spatially plotting covariates
 
 #Read in the shape file for villages
-poly1 <- readShapePoly("pilgrim_africa_villages_shapefile/pilgrim_villages.shp")
+poly1 <- readShapePoly("pilgrim_villages.shp")
 
 #Checking village names in shapefile
 #poly1@data
