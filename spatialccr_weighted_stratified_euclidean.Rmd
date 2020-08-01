@@ -1,7 +1,7 @@
 ---
 title: "Cluster Assignment and Stratified Covariate Constrained Randomization for Spatially-Correlated Data: Euclidean Distances"
 author: "Patrick Iben"
-date: "July 29, 2020"
+date: "August 1, 2020"
 output:
   html_document: default
   word_document: default
@@ -30,7 +30,7 @@ library(tools)
 choose.dir()
 ```
 
-After loading necessary packages and setting the directory, spatial feature and geo-location data are read in and cleaned, to merge into spatial polygons data frame. After the study data has been merged with the geo-location data, subsets are made of each sub-county(stratum). This will allow us to maintain the separation of sub-counties during cluster optimization.
+After loading necessary packages and setting the directory, spatial feature and geo-location data are read in and cleaned, to merge into spatial polygons data frame. After the study data has been merged with the geo-location data, subsets are made of each sub-county (stratum). This will allow us to maintain the separation of sub-counties during cluster optimization.
 
 ```{r, echo=T, message=F, warning=F, include = F}
 #Reading in village data
